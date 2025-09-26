@@ -1,0 +1,4 @@
+[versions]
+micronaut = "4.9.3"
+
+[libraries]
