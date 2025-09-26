@@ -32,7 +32,7 @@ public interface ConsulLeadershipClient {
     Mono<Session> createSession(@Body Session newSession);
 
     @Put(value = "/session/renew/{sessionId}")
-    void renewSession(@PathVariable("sessionId") String sessionId);
+    Mono<Void> renewSession(@PathVariable("sessionId") String sessionId);
 
     @Put(value = "/session/destroy/{sessionId}")
     Mono<Void> destroySession(@PathVariable("sessionId") String sessionId);

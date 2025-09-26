@@ -145,15 +145,21 @@ public class LeaderElectionImpl implements LeaderElection {
         val sessionId = sessionIdRef.get();
         if (sessionId != null) {
             log.debug("Renewing session: {}", sessionId);
-            try {
-                client.renewSession(sessionId);
-            } catch (Exception e) {
-                log.error("Failed to renew session {}, this may lead to leadership loss", sessionId, e);
-                // Consider implementing retry logic or triggering re-election
-            }
+            client.renewSession(sessionId)
+                    .onErrorResume(error -> {
+                        log.error("Failed to renew session {}, this may lead to leadership loss", sessionId, error);
+                        // fixme Consider implementing retry logic or triggering re-election
+                        return Mono.error(new RuntimeException("Session renewal failed", error));
+                    })
+                    .timeout(getTimeout()) // Add timeout to prevent hanging
+                    .block();
         } else {
             log.warn("Attempting to renew session without valid session ID");
         }
+    }
+
+    private Duration getTimeout() {
+        return Duration.ofMillis(configuration.getElection().getTimeoutMs());
     }
 
     private Mono<Void> readLeadershipInfo() {
@@ -270,11 +276,11 @@ public class LeaderElectionImpl implements LeaderElection {
                         .then(Mono.defer(this::cancelSessionRenewal))
                         .then(Mono.defer(this::destroySession))
                         .then(Mono.defer(this::stopWatching))
-                        .timeout(Duration.ofSeconds(30)) // Add timeout to prevent hanging
+                        .timeout(getTimeout()) // Add timeout to prevent hanging
                         .block();
             } else {
                 stopWatching()
-                        .timeout(Duration.ofSeconds(10))
+                        .timeout(getTimeout()) // Add timeout to prevent hanging
                         .block();
             }
         } catch (Exception e) {

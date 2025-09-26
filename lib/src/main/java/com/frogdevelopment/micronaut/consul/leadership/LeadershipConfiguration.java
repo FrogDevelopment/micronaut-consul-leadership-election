@@ -49,6 +49,9 @@ public interface LeadershipConfiguration {
 
         @Bindable(defaultValue = "500")
         Integer getRetryDelayMs();
+
+        @Bindable(defaultValue = "3000")
+        Integer getTimeoutMs();
     }
 
 }
