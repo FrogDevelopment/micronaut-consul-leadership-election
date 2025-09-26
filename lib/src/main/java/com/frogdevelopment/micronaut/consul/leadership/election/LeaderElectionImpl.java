@@ -19,8 +19,10 @@ import com.frogdevelopment.micronaut.consul.leadership.LeadershipConfiguration;
 import com.frogdevelopment.micronaut.consul.leadership.client.ConsulLeadershipClient;
 import com.frogdevelopment.micronaut.consul.leadership.client.KeyValue;
 import com.frogdevelopment.micronaut.consul.leadership.client.Session;
+import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipEvent;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.consul.condition.RequiresConsul;
@@ -71,6 +73,7 @@ public class LeaderElectionImpl implements LeaderElection {
     private final SessionProvider sessionProvider;
     private final LeadershipInfoProvider leadershipInfoProvider;
     private final TaskScheduler taskScheduler;
+    private final ApplicationEventPublisher<LeadershipEvent> applicationEventPublisher;
 
     private final Base64.Decoder base64Decoder = Base64.getDecoder();
 
@@ -105,12 +108,17 @@ public class LeaderElectionImpl implements LeaderElection {
                     lockAcquireRef.set(result);
                     return Boolean.TRUE.equals(result) ? handleIsLeader() : handleIsNotLeader();
                 })
+                .then(Mono.defer(this::publishElectionResult))
                 .onErrorResume(error -> {
                     log.error("Error during leadership application", error);
                     return handleLeadershipApplicationError(error);
                 });
 
         watchForLeadershipInfoChanges(mono);
+    }
+
+    private Mono<Void> publishElectionResult() {
+        return Mono.fromRunnable(() -> applicationEventPublisher.publishEventAsync(new LeadershipEvent(isLeader())));
     }
 
     private Mono<Void> handleIsLeader() {
