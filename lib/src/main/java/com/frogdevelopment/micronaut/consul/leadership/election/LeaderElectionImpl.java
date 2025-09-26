@@ -29,6 +29,33 @@ import io.micronaut.scheduling.TaskScheduler;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 
+/**
+ * Default implementation of {@link LeaderElection} using Consul for distributed leadership election.
+ * <p>
+ * This class implements a robust leader election algorithm using Consul's session-based locking
+ * mechanism. It handles the complete lifecycle of leadership election including:
+ * </p>
+ * <ul>
+ *   <li>Session creation and management with automatic renewal</li>
+ *   <li>Leadership acquisition and release using Consul KV locks</li>
+ *   <li>Monitoring for leadership changes using Consul's blocking queries</li>
+ *   <li>Automatic cleanup and failover handling</li>
+ *   <li>Error recovery and retry logic</li>
+ * </ul>
+ * <p>
+ * The implementation is thread-safe and uses atomic references to manage state.
+ * When leadership is acquired, the instance schedules periodic session renewal
+ * to maintain leadership. When leadership is lost or voluntarily released,
+ * all associated resources are cleaned up properly.
+ * </p>
+ * <p>
+ * This bean is only created when Consul is available and leadership election
+ * is enabled via configuration.
+ * </p>
+ *
+ * @see <a href="https://developer.hashicorp.com/consul/docs/automate/application-leader-election">Consul Application Leader Election</a>
+ * @since 1.0.0
+ */
 // https://developer.hashicorp.com/consul/docs/automate/application-leader-election
 @Slf4j
 @Singleton
