@@ -65,7 +65,7 @@ final class DefaultSessionProviderImpl implements SessionProvider {
     @Override
     public Session createSession() {
         return Session.builder()
-                .name(environment.get("hostname", String.class, ""))
+                .name(environment.get("hostname", String.class, "n/a"))
                 .behavior(Session.Behavior.RELEASE)
                 .lockDelay(configuration.getElection().getSessionLockDelay())
                 .ttl(configuration.getElection().getSessionTtl())

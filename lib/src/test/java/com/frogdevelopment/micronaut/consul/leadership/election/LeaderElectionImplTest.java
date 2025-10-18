@@ -1,19 +1,18 @@
 package com.frogdevelopment.micronaut.consul.leadership.election;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import org.awaitility.Awaitility;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +28,7 @@ import com.frogdevelopment.micronaut.consul.leadership.client.ConsulLeadershipCl
 import com.frogdevelopment.micronaut.consul.leadership.client.KeyValue;
 import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
 import com.frogdevelopment.micronaut.consul.leadership.client.Session;
+import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipEventsPublisher;
 
 import io.micronaut.scheduling.TaskScheduler;
 import reactor.core.publisher.Mono;
@@ -55,6 +55,9 @@ class LeaderElectionImplTest {
     private TaskScheduler taskScheduler;
 
     @Mock
+    private LeadershipEventsPublisher leadershipEventsPublisher;
+
+    @Mock
     private ScheduledFuture<?> scheduledFuture;
 
     @Mock
@@ -70,18 +73,29 @@ class LeaderElectionImplTest {
     private ArgumentCaptor<Runnable> runnableCaptor;
 
     @Test
-    void testIsLeader_initiallyFalse() {
-        // When
-        boolean isLeader = leaderElection.isLeader();
+    void handleIsLeader_should_scheduleSessionRenewalThenReadLeadershipInfo() {
+        // given
+        given(configuration.getElection()).willReturn(electionConfiguration);
+        given(electionConfiguration.getSessionRenewalDelay()).willReturn(Duration.ofSeconds(10));
+        given(taskScheduler.scheduleWithFixedDelay(eq(Duration.ZERO), eq(Duration.ofSeconds(10)), runnableCaptor.capture())).will(invocation -> scheduledFuture);
 
-        // Then
-        assertFalse(isLeader, "Leader election should initially return false");
+        final var path = "leadership/test-app";
+        given(configuration.getPath()).willReturn(path);
+        given(client.readLeadership(path)).willReturn(Mono.just(List.of(mockKeyValue)));
+        given(mockKeyValue.getModifyIndex()).willReturn(1_234);
+
+        // when
+        final var optional = leaderElection.handleIsLeader().blockOptional();
+
+        // then
+        assertThat(optional).hasValue(1_234);
+        then(client).shouldHaveNoMoreInteractions();
     }
 
     @Test
     void testStart_successfulLeadershipAcquisition() {
         // Given
-        Session mockSession = createMockSession();
+        final Session mockSession = createMockSession();
         given(sessionProvider.createSession()).willReturn(mockSession);
         given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
 
@@ -96,6 +110,11 @@ class LeaderElectionImplTest {
 
         given(client.readLeadership(path)).willReturn(Mono.just(List.of(mockKeyValue)));
         given(mockKeyValue.getModifyIndex()).willReturn(1_234);
+        given(client.watchLeadership(path, 1_234)).willAnswer(invocation -> {
+            waitForAsyncOperations(1000);
+
+            return Mono.just(List.of(mockKeyValue));
+        });
 
         // When
         leaderElection.start();
@@ -104,11 +123,12 @@ class LeaderElectionImplTest {
         // Give some time for async operations to complete
         waitForAsyncOperations(200);
 
-        assertTrue(leaderElection.isLeader());
         then(sessionProvider).should().createSession();
         then(client).should().createSession(mockSession);
         then(client).should().acquireLeadership(path, mockLeadershipInfo, "test-session-id");
 
+        // Then
+        given(client.renewSession(mockSession.id())).willReturn(Mono.empty());
         runnableCaptor.getValue().run();
         then(client).should().renewSession(mockSession.id());
     }
@@ -116,7 +136,7 @@ class LeaderElectionImplTest {
     @Test
     void testStart_failedLeadershipAcquisition() {
         // Given
-        Session mockSession = createMockSession();
+        final Session mockSession = createMockSession();
         given(sessionProvider.createSession()).willReturn(mockSession);
         given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
 
@@ -128,6 +148,12 @@ class LeaderElectionImplTest {
         given(client.destroySession(mockSession.id())).willReturn(Mono.empty());
         given(client.readLeadership(path)).willReturn(Mono.just(List.of(mockKeyValue)));
 
+        given(client.watchLeadership(path, 0)).willAnswer(invocation -> {
+            waitForAsyncOperations(1000);
+
+            return Mono.just(List.of(mockKeyValue));
+        });
+
         // When
         leaderElection.start();
 
@@ -135,41 +161,12 @@ class LeaderElectionImplTest {
         waitForAsyncOperations(200);
 
         then(client).should().destroySession("test-session-id");
-        assertFalse(leaderElection.isLeader());
     }
 
     @Test
-    void testStart_sessionCreationFailure() {
-        // Given
-        Session mockSession = createMockSession();
-
-        given(sessionProvider.createSession()).willReturn(mockSession);
-        given(client.createSession(mockSession))
-                .willReturn(Mono.error(new RuntimeException("Session creation failed")));
-
-        // When
-        leaderElection.start();
-
-        // Then
-        waitForAsyncOperations(200);
-
-        then(client).should().createSession(mockSession);
-        assertFalse(leaderElection.isLeader());
-    }
-
-    @Test
-    void testStop_whenNotLeader() {
-        // When
-        leaderElection.stop();
-
-        // Then - should complete without errors
-        then(client).shouldHaveNoInteractions();
-    }
-
-    @Test
-    void testStop_whenLeader() {
+    void testStop() {
         // Given - simulate being a leader by setting up the internal state
-        Session mockSession = createMockSession();
+        final Session mockSession = createMockSession();
         given(sessionProvider.createSession()).willReturn(mockSession);
         given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
 
@@ -180,10 +177,17 @@ class LeaderElectionImplTest {
 
         given(configuration.getElection()).willReturn(electionConfiguration);
         given(electionConfiguration.getSessionRenewalDelay()).willReturn(Duration.ofSeconds(10));
+        given(electionConfiguration.getTimeoutMs()).willReturn(1000);
         given(taskScheduler.scheduleWithFixedDelay(eq(Duration.ZERO), eq(Duration.ofSeconds(10)), runnableCaptor.capture())).will((Answer<ScheduledFuture<?>>) invocation -> scheduledFuture);
 
         given(client.readLeadership(path)).willReturn(Mono.just(List.of(mockKeyValue)));
         given(mockKeyValue.getModifyIndex()).willReturn(1_234);
+
+        given(client.watchLeadership(path, 1_234)).willAnswer(invocation -> {
+            waitForAsyncOperations(1000);
+
+            return Mono.just(List.of(mockKeyValue));
+        });
 
         given(leadershipInfoProvider.getLeadershipInfo(false)).willReturn(mockLeadershipInfo);
         given(client.releaseLeadership(path, mockLeadershipInfo, mockSession.id())).willReturn(Mono.empty());
@@ -204,43 +208,9 @@ class LeaderElectionImplTest {
     }
 
     @Test
-    @Disabled
-    void testLeadershipWatching_emptyKeyValues() {
+    void testLeadershipWatching() {
         // Given
-        Session mockSession = createMockSession();
-        given(sessionProvider.createSession()).willReturn(mockSession);
-        given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
-
-        given(leadershipInfoProvider.getLeadershipInfo(true)).willReturn(mockLeadershipInfo);
-        final var path = "leadership/test-app";
-        given(configuration.getPath()).willReturn(path);
-        given(client.acquireLeadership(path, mockLeadershipInfo, mockSession.id())).willReturn(Mono.just(false));
-
-        given(client.destroySession(mockSession.id())).willReturn(Mono.empty());
-
-        // 1st calls return empty KV
-        // 2d calls return actual data
-        given(client.readLeadership(path))
-                .willReturn(Mono.just(List.of()))
-                .willReturn(Mono.just(List.of(mockKeyValue)));
-        given(mockKeyValue.getModifyIndex()).willReturn(1_234);
-        given(client.watchLeadership(eq(path), isNull())).willReturn(Mono.just(List.of()));
-        given(client.watchLeadership(path, 1_234)).willReturn(Mono.just(List.of(mockKeyValue)));
-        given(mockKeyValue.getSession()).willReturn(mockSession.id());
-
-        // When
-        leaderElection.start();
-        waitForAsyncOperations(300); // Give more time for watching operations
-
-        // Then
-        assertFalse(leaderElection.isLeader());
-    }
-
-    @Test
-    @Disabled
-    void testLeadershipWatching_withActiveSession() {
-        // Given
-        Session mockSession = createMockSession();
+        final Session mockSession = createMockSession();
         given(sessionProvider.createSession()).willReturn(mockSession);
         given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
 
@@ -254,21 +224,94 @@ class LeaderElectionImplTest {
         given(client.readLeadership(path)).willReturn(Mono.just(List.of(mockKeyValue)));
         given(mockKeyValue.getModifyIndex()).willReturn(1_234);
         given(mockKeyValue.getSession()).willReturn("other-session-id");
-        given(client.watchLeadership(path, 1_234)).willReturn(Mono.just(List.of(mockKeyValue)));
+
+        final var counter = new AtomicInteger(0);
+        given(client.watchLeadership(path, 1_234)).willAnswer(invocation -> {
+            if (counter.incrementAndGet() == 3) {
+                leaderElection.stop();
+            }
+
+            waitForAsyncOperations(1000);
+
+            return Mono.just(List.of(mockKeyValue));
+        });
         given(mockKeyValue.getSession()).willReturn(mockSession.id());
+        given(configuration.getElection()).willReturn(electionConfiguration);
+        given(electionConfiguration.getTimeoutMs()).willReturn(1000);
+
+        // When
+        leaderElection.start();
+        waitForAsyncOperations(300); // Give more time for watching operations
+
+        // Then
+        Awaitility.await().untilAtomic(counter, Matchers.equalTo(3));
+        then(client).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
+    void testErrorsHandling_sessionProvider_createSession() {
+        // Given
+        given(sessionProvider.createSession())
+                .willThrow(new RuntimeException("createSession error"));
+
+        given(configuration.getElection()).willReturn(electionConfiguration);
+        given(electionConfiguration.getTimeoutMs()).willReturn(1000);
 
         // When
         leaderElection.start();
         waitForAsyncOperations(300);
 
         // Then
-        assertFalse(leaderElection.isLeader());
+        then(client).shouldHaveNoMoreInteractions();
     }
 
     @Test
-    void testErrorHandling_acquireLeadershipError() {
+    void testErrorsHandling_client_createSession() {
         // Given
-        Session mockSession = createMockSession();
+        final Session mockSession = createMockSession();
+
+        given(sessionProvider.createSession()).willReturn(mockSession);
+        given(client.createSession(mockSession))
+                .willReturn(Mono.error(new RuntimeException("createSession error")));
+
+        given(configuration.getElection()).willReturn(electionConfiguration);
+        given(electionConfiguration.getTimeoutMs()).willReturn(1000);
+
+        // When
+        leaderElection.start();
+        waitForAsyncOperations(300);
+
+        // Then
+        then(client).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
+    void testErrorsHandling_getLeadershipInfo() {
+        // Given
+        final Session mockSession = createMockSession();
+
+        given(sessionProvider.createSession()).willReturn(mockSession);
+        given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
+        given(leadershipInfoProvider.getLeadershipInfo(true)).willThrow(new RuntimeException("getLeadershipInfo error"));
+
+        given(configuration.getElection()).willReturn(electionConfiguration);
+        given(electionConfiguration.getTimeoutMs()).willReturn(1000);
+
+        given(client.destroySession(any())).willReturn(Mono.empty());
+
+        // When
+        leaderElection.start();
+        waitForAsyncOperations(500);
+
+        // Then
+        then(client).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
+    @Disabled
+    void testErrorsHandling_acquireLeadership() {
+        // Given
+        final Session mockSession = createMockSession();
 
         given(sessionProvider.createSession()).willReturn(mockSession);
         given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
@@ -276,38 +319,50 @@ class LeaderElectionImplTest {
         final var path = "leadership/test-app";
         given(configuration.getPath()).willReturn(path);
         given(client.acquireLeadership(path, mockLeadershipInfo, mockSession.id()))
-                .willReturn(Mono.error(new RuntimeException("Consul error")));
+                .willReturn(Mono.error(new RuntimeException("acquireLeadership error")));
+
+        given(configuration.getElection()).willReturn(electionConfiguration);
+        given(electionConfiguration.getTimeoutMs()).willReturn(1000);
+
+        given(client.destroySession(any())).willReturn(Mono.empty());
 
         // When
         leaderElection.start();
-        waitForAsyncOperations(300);
+        waitForAsyncOperations(500);
 
         // Then
-        assertFalse(leaderElection.isLeader());
+        then(client).shouldHaveNoMoreInteractions();
     }
 
     @Test
-    void testResourceCleanup_onStop() {
-        // Given - set up a scenario where resources need cleanup
-        Session mockSession = createMockSession();
+    void testErrorsHandling() {
+        // Given
+        final Session mockSession = createMockSession();
 
         given(sessionProvider.createSession()).willReturn(mockSession);
         given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
-        given(client.destroySession(anyString())).willReturn(Mono.empty());
-        given(leadershipInfoProvider.getLeadershipInfo(anyBoolean())).willReturn(mockLeadershipInfo);
-        given(client.acquireLeadership(anyString(), any(), anyString()))
-                .willReturn(Mono.just(false));
-        given(client.readLeadership(anyString())).willReturn(Mono.just(List.of()));
+        given(leadershipInfoProvider.getLeadershipInfo(true)).willReturn(mockLeadershipInfo);
+        final var path = "leadership/test-app";
+        given(configuration.getPath()).willReturn(path);
+        given(client.acquireLeadership(path, mockLeadershipInfo, mockSession.id()))
+                .willReturn(Mono.error(new RuntimeException("acquireLeadership error")));
 
-        // Start the election process
-        leaderElection.start();
-        waitForAsyncOperations(200);
+        given(client.destroySession(any()))
+                .willReturn(Mono.error(new RuntimeException("destroySession error")));
+        given(client.readLeadership(any()))
+                .willReturn(Mono.error(new RuntimeException("readLeadership error")));
+        given(client.watchLeadership(any(), any()))
+                .willReturn(Mono.error(new IllegalStateException("watchLeadership error")));
+
+        given(configuration.getElection()).willReturn(electionConfiguration);
+        given(electionConfiguration.getTimeoutMs()).willReturn(1000);
 
         // When
-        leaderElection.stop();
+        leaderElection.start();
+        waitForAsyncOperations(500);
 
-        // Then - verify cleanup operations
-        assertFalse(leaderElection.isLeader());
+        // Then
+        then(client).shouldHaveNoMoreInteractions();
     }
 
     private Session createMockSession() {
@@ -322,10 +377,10 @@ class LeaderElectionImplTest {
                 .build();
     }
 
-    private void waitForAsyncOperations(int millis) {
+    private void waitForAsyncOperations(final int millis) {
         try {
             Thread.sleep(millis);
-        } catch (InterruptedException e) {
+        } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
         }
     }

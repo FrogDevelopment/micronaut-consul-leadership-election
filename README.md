@@ -28,8 +28,8 @@ Add the dependency to your `build.gradle` (Gradle) or `pom.xml` (Maven):
 
 ### Gradle
 
-```groovy
-implementation 'micronaut.consul.leadership.election:lib:1.0.0-SNAPSHOT'
+```kotlin
+implementation("frog.development.micronaut.consul:leadership-election:1.0.0-SNAPSHOT")
 ```
 
 ### Maven
@@ -37,20 +37,21 @@ implementation 'micronaut.consul.leadership.election:lib:1.0.0-SNAPSHOT'
 ```xml
 
 <dependency>
-    <groupId>micronaut.consul.leadership.election</groupId>
-    <artifactId>lib</artifactId>
+    <groupId>frog.development.micronaut.consul</groupId>
+    <artifactId>leadership-election</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
 ```
 
 ## Configuration
 
-Configure the leadership election in your `application.yml`:
+Configure the leadership election in your `application.yaml`:
 
 ```yaml
 consul:
   leadership:
     enabled: true                    # Enable leadership election
+    auto-start.disabled: false       # Disabling starting and stopping election with application
     token: "your-consul-token"       # Optional: Consul ACL token
     path: "leadership/my-app"        # Consul KV path for leadership coordination
     election:
@@ -66,7 +67,8 @@ consul:
 
 | Property                                           | Type     | Default                                    | Description                                                                 |
 |----------------------------------------------------|----------|--------------------------------------------|-----------------------------------------------------------------------------|
-| `consul.leadership.enabled`                        | Boolean  | `false`                                    | Enable/disable the leadership election feature                              |
+| `consul.leadership.enabled`                        | Boolean  | `true`                                     | Enable/disable the leadership election feature                              |
+| `consul.leadership.auto-start.disabled`            | Boolean  | `false`                                    | Enable/disable bounding the leadership election tp application livecycle    |
 | `consul.leadership.token`                          | String   | -                                          | Consul ACL token for authentication                                         |
 | `consul.leadership.path`                           | String   | `leadership/${micronaut.application.name}` | Consul KV path for leadership coordination                                  |
 | `consul.leadership.election.enabled`               | Boolean  | `false`                                    | Enable/disable the election process                                         |
@@ -107,9 +109,34 @@ public class MyService {
 }
 ```
 
+or listen to an event:
+
+```java
+import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipEvent;
+
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
+@Singleton
+public class MyOtherService {
+
+    @EventListener
+    public void onLeadershipChange(final LeadershipEvent event) {
+        if (event.isLeader()) {
+            // This code will only execute on the leader instance
+            System.out.println("I am now the leader, so I will perform critical operations...");
+            // Your critical business logic here
+        } else {
+            System.out.println("I am not the leader anymore, stopping critical operations.");
+        }
+    }
+}
+```
+
 ### Manual Control
 
-You can manually start and stop the leadership election process:
+You can manually start and stop the leadership election process by set configuration
+`consul.leadership.auto-start.disabled=true` :
 
 ```java
 
@@ -172,12 +199,11 @@ import java.time.LocalDateTime;
 public class CustomLeadershipInfoProvider implements LeadershipInfoProvider {
 
     @Override
-    public LeadershipInfo getLeadershipInfo(boolean isAcquire) {
-        return DefaultLeadershipInfo.builder()
+    public LeadershipInfo getLeadershipInfo(final boolean isAcquire) {
+        return MyLeadershipInfo.builder()
                 .hostname("my-custom-hostname")
                 .clusterName("production-cluster")
-                .acquireDateTime(isAcquire ? LocalDateTime.now().toString() : null)
-                .releaseDateTime(!isAcquire ? LocalDateTime.now().toString() : null)
+                .provider("GCP")
                 .build();
     }
 }
@@ -226,13 +252,11 @@ title: When stopping application
 ---
 flowchart TB
 ;
-    stop((Stop)) --> isLeader{is Leader ?}
-    isLeader -- " no " --> stopWatching[Stop Watching Leadership]
-    isLeader -- " yes " --> releaseLeadership[Release Leadership]
-    releaseLeadership --> cancelSessionRenewal[Cancel Session Renewal]
-    cancelSessionRenewal --> destroySession[Destroy Session]
-    destroySession --> stopWatching
-    stopWatching --> x(((end)))
+    stop((Stop)) --> stopWatching[Stop Watching Leadership]
+    stopWatching -->  cancelSessionRenewal[Cancel Session Renewal]
+    cancelSessionRenewal --> releaseLeadership[Release Leadership]
+    releaseLeadership --> destroySession[Destroy Session]
+    destroySession --> x(((end)))
 ```
 
 ## API Reference

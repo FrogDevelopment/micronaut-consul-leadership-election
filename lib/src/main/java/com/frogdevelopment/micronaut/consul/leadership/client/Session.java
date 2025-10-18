@@ -6,12 +6,15 @@ import lombok.extern.jackson.Jacksonized;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
 import io.micronaut.serde.annotation.Serdeable;
 
 @Builder
 @Serdeable
 @Jacksonized
+@JsonNaming(PropertyNamingStrategies.UpperCamelCaseStrategy.class)
 public record Session(
         @JsonProperty("ID") String id,
         @JsonProperty("Name") String name,
@@ -21,6 +24,7 @@ public record Session(
         @JsonProperty("TTL") String ttl,
         @JsonProperty("NodeChecks") List<String> nodeChecks) {
 
+    @Serdeable
     public enum Behavior {
         @JsonProperty("release")
         RELEASE,

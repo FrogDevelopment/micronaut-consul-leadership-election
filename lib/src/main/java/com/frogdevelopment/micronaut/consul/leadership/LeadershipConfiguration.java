@@ -116,8 +116,8 @@ public interface LeadershipConfiguration {
         @Bindable(defaultValue = "10s")
         Duration getSessionRenewalDelay();
 
-//        @Bindable(defaultValue = "3")
-//        Integer getMaxRetryAttempts();
+        @Bindable(defaultValue = "3")
+        Integer getMaxRetryAttempts();
 
         /**
          * Gets the delay in milliseconds between retry attempts.

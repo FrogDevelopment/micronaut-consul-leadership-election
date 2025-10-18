@@ -10,6 +10,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.discovery.consul.client.v1.ConsulClient;
 import io.micronaut.discovery.consul.client.v1.blockingqueries.BlockedQueries;
 import io.micronaut.discovery.consul.client.v1.blockingqueries.BlockingQueriesConfiguration;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
@@ -49,7 +50,7 @@ public interface ConsulLeadershipClient {
      * @param newSession the session configuration including TTL, lock delay, and behavior
      * @return a Mono containing the created session with its assigned ID
      */
-    @Put(value = "/session/create")
+    @Put(value = "/session/create", processes = MediaType.APPLICATION_JSON, single = true)
     Mono<Session> createSession(@Body Session newSession);
 
     /**
@@ -63,7 +64,7 @@ public interface ConsulLeadershipClient {
      * @param sessionId the ID of the session to renew
      * @return a Mono that completes when the session is successfully renewed
      */
-    @Put(value = "/session/renew/{sessionId}")
+    @Put(value = "/session/renew/{sessionId}", processes = MediaType.APPLICATION_JSON, single = true)
     Mono<Void> renewSession(@PathVariable("sessionId") String sessionId);
 
     /**
@@ -77,7 +78,7 @@ public interface ConsulLeadershipClient {
      * @param sessionId the ID of the session to destroy
      * @return a Mono that completes when the session is successfully destroyed
      */
-    @Put(value = "/session/destroy/{sessionId}")
+    @Put(value = "/session/destroy/{sessionId}", processes = MediaType.APPLICATION_JSON, single = true)
     Mono<Void> destroySession(@PathVariable("sessionId") String sessionId);
 
     // ELECTION
@@ -95,7 +96,7 @@ public interface ConsulLeadershipClient {
      * @param sessionId the session ID to use for acquiring the lock
      * @return a Mono containing true if leadership was acquired, false otherwise
      */
-    @Put(value = "/kv/{key}")
+    @Put(value = "/kv/{key}", processes = MediaType.APPLICATION_JSON, single = true)
     Mono<Boolean> acquireLeadership(@PathVariable("key") String key, @Body Object value,
                                     @NotBlank @QueryValue("acquire") String sessionId);
 
@@ -112,7 +113,7 @@ public interface ConsulLeadershipClient {
      * @param sessionId the session ID that currently holds the lock
      * @return a Mono that completes when leadership is successfully released
      */
-    @Put(value = "/kv/{key}")
+    @Put(value = "/kv/{key}", processes = MediaType.APPLICATION_JSON, single = true)
     Mono<Void> releaseLeadership(@PathVariable("key") String key, @Body Object value,
                                  @NotBlank @QueryValue("release") String sessionId);
 
@@ -127,7 +128,7 @@ public interface ConsulLeadershipClient {
      * @param key the Consul KV key to read
      * @return a Mono containing a list of KeyValue objects with leadership information
      */
-    @Get(value = "/kv/{key}", single = true)
+    @Get(value = "/kv/{key}", processes = MediaType.APPLICATION_JSON, single = true)
     Mono<List<KeyValue>> readLeadership(@PathVariable("key") String key);
 
     /**
@@ -142,7 +143,7 @@ public interface ConsulLeadershipClient {
      * @param index the modify index to wait for changes from (null for immediate return)
      * @return a Mono containing updated leadership information when changes occur
      */
-    @Get(uri = "/kv/{key}", single = true)
+    @Get(uri = "/kv/{key}", processes = MediaType.APPLICATION_JSON, single = true)
     Mono<List<KeyValue>> watchLeadership(@PathVariable("key") String key,
                                          @QueryValue("index") Integer index);
 }

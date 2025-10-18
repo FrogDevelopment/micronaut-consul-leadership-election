@@ -37,4 +37,6 @@ public interface LeadershipInfoProvider {
      * @return the leadership information object to store in Consul
      */
     LeadershipInfo getLeadershipInfo(boolean isAcquire);
+
+    LeadershipInfo convertValue(String encodedValue);
 }

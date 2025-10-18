@@ -13,13 +13,6 @@ package com.frogdevelopment.micronaut.consul.leadership.election;
 public interface LeaderElection {
 
     /**
-     * Checks if the current instance is the leader.
-     *
-     * @return {@code true} if this instance is currently the leader, {@code false} otherwise
-     */
-    boolean isLeader();
-
-    /**
      * Starts the leader election process.
      * <p>
      * This method initiates the election process where the instance will attempt to

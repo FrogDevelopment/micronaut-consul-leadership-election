@@ -1,11 +1,14 @@
 package com.frogdevelopment.micronaut.consul.leadership.election;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
 
 import jakarta.inject.Singleton;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.frogdevelopment.micronaut.consul.leadership.client.DefaultLeadershipInfo;
 import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
 
@@ -35,12 +38,14 @@ import io.micronaut.context.env.Environment;
  *
  * @since 1.0.0
  */
+@Slf4j
 @Singleton
 @RequiredArgsConstructor
 @Requires(missingBeans = LeadershipInfoProvider.class)
 final class DefaultLeadershipInfoProviderImpl implements LeadershipInfoProvider {
 
     private final Environment environment;
+    private final ObjectMapper objectMapper;
 
     /**
      * Creates leadership information for the current application instance.
@@ -62,13 +67,23 @@ final class DefaultLeadershipInfoProviderImpl implements LeadershipInfoProvider 
     @Override
     public LeadershipInfo getLeadershipInfo(final boolean isAcquire) {
         final var builder = DefaultLeadershipInfo.builder()
-                .hostname(environment.get("hostname", String.class, ""))
-                .clusterName(environment.get("cluster_name", String.class, ""));
+                .hostname(environment.get("hostname", String.class, "n/a"))
+                .clusterName(environment.get("cluster_name", String.class, "n/a"));
         if (isAcquire) {
             builder.acquireDateTime(LocalDateTime.now().toString());
         } else {
             builder.releaseDateTime(LocalDateTime.now().toString());
         }
         return builder.build();
+    }
+
+    @Override
+    public LeadershipInfo convertValue(final String leadershipInfoValue) {
+        try {
+            log.debug("Current leader information: {}", leadershipInfoValue);
+            return objectMapper.readValue(leadershipInfoValue, DefaultLeadershipInfo.class);
+        } catch (final JsonProcessingException e) {
+            throw new NonRecoverableElectionException("Unable to process leadershipInfo value " + leadershipInfoValue, e);
+        }
     }
 }
