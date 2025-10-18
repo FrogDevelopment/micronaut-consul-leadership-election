@@ -2,15 +2,17 @@ plugins {
     id("io.micronaut.minimal.library") version "4.5.4"
     id("com.gradleup.shadow") version "8.3.7"
 //    id("io.micronaut.aot") version "4.5.4"
+    `maven-publish`
 }
 
 version = "1.0.0-SNAPSHOT"
-group = "micronaut.consul.leadership.election"
+group = "com.frogdevelopment.micronaut.consul"
 
 repositories {
     mavenCentral()
 }
 
+val mockitoAgent = configurations.create("mockitoAgent")
 dependencies {
     annotationProcessor(mn.lombok)
     annotationProcessor(mn.micronaut.serde.processor)
@@ -18,6 +20,7 @@ dependencies {
     implementation(mn.micronaut.serde.jackson)
     implementation(mn.micronaut.jackson.databind)
     implementation(mn.micronaut.discovery.client)
+    implementation(mn.micronaut.management)
     implementation(mn.reactor)
 
     compileOnly(mn.lombok)
@@ -28,6 +31,22 @@ dependencies {
     testImplementation(mn.micronaut.test.junit5)
     testImplementation(mn.mockito.junit.jupiter)
 //    testImplementation("io.projectreactor:reactor-test:3.6.7")
+    testImplementation(mn.testcontainers.core)
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:consul")
+    testImplementation(mn.assertj.core)
+    testImplementation("org.awaitility:awaitility:4.3.0")
+
+    testRuntimeOnly(mn.micronaut.http.server.netty)
+    testRuntimeOnly(mn.micronaut.http.client)
+
+    mockitoAgent(mn.mockito.core) { isTransitive = false }
+}
+
+tasks {
+    test {
+        jvmArgs.add("-javaagent:${mockitoAgent.asPath}")
+    }
 }
 
 testing {
@@ -45,6 +64,9 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
+
+    withJavadocJar()
+    withSourcesJar()
 }
 
 micronaut {
@@ -65,5 +87,63 @@ micronaut {
 //        deduceEnvironment = true
 //        optimizeNetty = true
 //        replaceLogbackXml = true
+//    }
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("mavenJava") {
+            artifactId = "leadership-election"
+
+            versionMapping {
+                usage("java-api") {
+                    fromResolutionOf("runtimeClasspath")
+                }
+                usage("java-runtime") {
+                    fromResolutionResult()
+                }
+            }
+
+            pom {
+                name = "Micronaut Consul Leadership Election"
+                description = "Leadership Election for Micronaut using Consul's distributed leadership election."
+                url = "https://github.com/FrogDevelopment/micronaut-consul-leadership-election/wiki"
+                inceptionYear = "2025"
+                issueManagement {
+                    system = "GitHub"
+                    url = "https://github.com/FrogDevelopment/micronaut-consul-leadership-election/issues"
+                }
+                developers {
+                    developer {
+                        id = "FrogDevelopper"
+                        name = "Le Gall Benoît"
+                        email = "legall.benoit@gmail.com"
+                        url = "https://github.com/FrogDevelopper"
+                        timezone = "Europe/Paris"
+                    }
+                }
+                licenses {
+                    license {
+                        name = "The Apache License, Version 2.0"
+                        url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+                    }
+                }
+                scm {
+                    connection = "scm:git:git://github.com/FrogDevelopment/consul-populate.git"
+                    developerConnection = "scm:git:ssh://github.com:FrogDevelopment/consul-populate.git"
+                    url = "https://github.com/FrogDevelopment/micronaut-consul-leadership-election/tree/master"
+                }
+                distributionManagement {
+                    downloadUrl = "https://github.com/FrogDevelopment/micronaut-consul-leadership-election/releases"
+                }
+            }
+        }
+    }
+
+//    repositories {
+//        maven {
+//            name = "jreleaser"
+//            url = uri(layout.buildDirectory.dir("staging-deploy"))
+//        }
 //    }
 }
