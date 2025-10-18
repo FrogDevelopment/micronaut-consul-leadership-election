@@ -9,6 +9,22 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.ClientFilter;
 import io.micronaut.http.annotation.RequestFilter;
 
+/**
+ * HTTP client filter that automatically adds Consul authentication tokens to requests.
+ * <p>
+ * This filter intercepts HTTP requests to Consul and adds the authentication token
+ * header when a token is configured in the {@link LeadershipConfiguration}. It ensures
+ * that all leadership election operations are properly authenticated when Consul's
+ * ACL system is enabled.
+ * </p>
+ * <p>
+ * The filter is only applied to clients annotated with {@link ConsulLeadershipAuth}.
+ * If no token is configured, requests are sent without authentication.
+ * </p>
+ *
+ * @see ConsulLeadershipAuth
+ * @since 1.0.0
+ */
 @ClientFilter
 @ConsulLeadershipAuth
 @RequiredArgsConstructor
@@ -18,8 +34,13 @@ public class ConsulLeadershipAuthFilter {
 
     /**
      * Filters HTTP requests by adding a Consul token header if available.
+     * <p>
+     * If a Consul token is configured in the leadership configuration, this method
+     * adds it to the request headers using the standard Consul token header name.
+     * This allows the application to authenticate with Consul's ACL system.
+     * </p>
      *
-     * @param request The mutable HTTP request to modify
+     * @param request the mutable HTTP request to modify
      */
     @RequestFilter
     void filterRequest(final MutableHttpRequest<?> request) {

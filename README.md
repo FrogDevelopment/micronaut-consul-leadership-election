@@ -13,6 +13,9 @@ performs critical operations at any given time.
 - **Configurable Behavior**: Extensive configuration options for session TTL, lock delays, retry logic, and timeouts
 - **Error Recovery**: Robust error handling with automatic retry and failover capabilities
 - **Leadership Monitoring**: Watch for leadership changes and react accordingly
+- **Management Endpoint**: Built-in `/leadership` endpoint for monitoring leadership status
+- **Event-Driven Architecture**: Publish leadership change events for reactive application behavior
+- **Comprehensive Documentation**: Fully documented API with detailed JavaDoc for all public classes and methods
 - **Graceful Shutdown**: Properly releases leadership and cleans up resources during application shutdown
 
 ## Requirements
@@ -52,13 +55,14 @@ consul:
   leadership:
     enabled: true                    # Enable leadership election
     auto-start.disabled: false       # Disabling starting and stopping election with application
-    token: "your-consul-token"       # Optional: Consul ACL token
+    token: "your-consul-token"       # Optional: Consul ACL token with required permissions
     path: "leadership/my-app"        # Consul KV path for leadership coordination
     election:
       enabled: true                  # Enable election process
       session-lock-delay: "5s"       # Lock delay after session destruction
       session-ttl: "15s"             # Session time-to-live
       session-renewal-delay: "10s"   # Session renewal frequency
+      max-retry-attempts: "3"        # Maximum number of retry attempts for operations
       retry-delay-ms: 500            # Retry delay in milliseconds
       timeout-ms: 3000               # Operation timeout in milliseconds
 ```
@@ -75,6 +79,7 @@ consul:
 | `consul.leadership.election.session-lock-delay`    | String   | `5s`                                       | Time before a session can acquire a lock after previous session destruction |
 | `consul.leadership.election.session-ttl`           | String   | `15s`                                      | Session time-to-live duration                                               |
 | `consul.leadership.election.session-renewal-delay` | Duration | `10s`                                      | Frequency of session renewal attempts                                       |
+| `consul.leadership.election.max-retry-attempts`    | Integer  | `3`                                        | Frequency of session renewal attempts                                       |
 | `consul.leadership.election.retry-delay-ms`        | Integer  | `500`                                      | Delay between retry attempts in milliseconds                                |
 | `consul.leadership.election.timeout-ms`            | Integer  | `3000`                                     | Timeout for Consul operations in milliseconds                               |
 
@@ -86,7 +91,7 @@ The leadership election starts automatically when the application context is ini
 `LeaderElection` service to check leadership status:
 
 ```java
-import com.frogdevelopment.micronaut.consul.leadership.election.LeaderElection;
+import com.frogdevelopment.micronaut.consul.leadership.status.LeadershipStatus;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -95,10 +100,10 @@ import jakarta.inject.Singleton;
 public class MyService {
 
     @Inject
-    private LeaderElection leaderElection;
+    private LeadershipStatus leadershipStatus;
 
     public void performCriticalOperation() {
-        if (leaderElection.isLeader()) {
+        if (leadershipStatus.isLeader()) {
             // This code will only execute on the leader instance
             System.out.println("I am the leader, performing critical operations...");
             // Your critical business logic here
@@ -109,29 +114,73 @@ public class MyService {
 }
 ```
 
-or listen to an event:
+or listen to leadership change events.
+
+### Leadership Events
+
+The library publishes two types of events that you can listen to:
+
+#### LeadershipChangeEvent
+
+Fired when this instance's leadership status changes (acquires or loses leadership):
 
 ```java
-import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipEvent;
+import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipChangeEvent;
 
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
+import io.micronaut.runtime.event.annotation.EventListener;
 
-@Singleton
-public class MyOtherService {
-
-    @EventListener
-    public void onLeadershipChange(final LeadershipEvent event) {
-        if (event.isLeader()) {
-            // This code will only execute on the leader instance
-            System.out.println("I am now the leader, so I will perform critical operations...");
-            // Your critical business logic here
-        } else {
-            System.out.println("I am not the leader anymore, stopping critical operations.");
-        }
-    }
+@EventListener
+public void onLeadershipChange(final LeadershipChangeEvent event) {
+    final boolean isLeader = event.isLeader();
+    // React to leadership status change
 }
 ```
+
+#### LeadershipInfoChangeEvent
+
+Fired when the current leader's information changes (new leader elected or leader metadata updated):
+
+```java
+import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipInfoChangeEvent;
+import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
+
+import io.micronaut.runtime.event.annotation.EventListener;
+
+@EventListener
+public void onLeadershipInfoChange(final LeadershipInfoChangeEvent event) {
+    final LeadershipInfo info = event.leadershipInfo();
+    // Access leader details like hostname, cluster name, timestamps, etc.
+}
+```
+
+### Management Endpoint
+
+The library provides a management endpoint at `/leadership` that exposes the current leadership status:
+
+```bash
+curl http://localhost:8080/leadership
+```
+
+Response example:
+
+```json
+{
+  "isLeader": true,
+  "details": {
+    "hostname": "app-instance-1",
+    "clusterName": "production-cluster",
+    "acquireDateTime": "2025-10-18T22:45:30",
+    "releaseDateTime": null
+  }
+}
+```
+
+This endpoint is useful for:
+
+- Health checks and monitoring
+- Load balancer routing decisions
+- Operational dashboards
+- External system integration
 
 ### Manual Control
 
@@ -253,7 +302,7 @@ title: When stopping application
 flowchart TB
 ;
     stop((Stop)) --> stopWatching[Stop Watching Leadership]
-    stopWatching -->  cancelSessionRenewal[Cancel Session Renewal]
+    stopWatching --> cancelSessionRenewal[Cancel Session Renewal]
     cancelSessionRenewal --> releaseLeadership[Release Leadership]
     releaseLeadership --> destroySession[Destroy Session]
     destroySession --> x(((end)))

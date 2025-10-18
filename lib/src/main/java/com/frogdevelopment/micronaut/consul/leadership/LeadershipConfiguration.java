@@ -116,6 +116,17 @@ public interface LeadershipConfiguration {
         @Bindable(defaultValue = "10s")
         Duration getSessionRenewalDelay();
 
+        /**
+         * Gets the maximum number of retry attempts for operations.
+         * <p>
+         * When operations fail (such as acquiring leadership or renewing sessions),
+         * the system will retry up to this many times before giving up. This setting
+         * helps ensure resilience in the face of transient network issues or
+         * temporary Consul unavailability.
+         * </p>
+         *
+         * @return the maximum number of retry attempts
+         */
         @Bindable(defaultValue = "3")
         Integer getMaxRetryAttempts();
 

@@ -77,6 +77,18 @@ final class DefaultLeadershipInfoProviderImpl implements LeadershipInfoProvider 
         return builder.build();
     }
 
+    /**
+     * Converts a JSON string representation of leadership information into a {@link LeadershipInfo} object.
+     * <p>
+     * This method deserializes the JSON string retrieved from Consul's key-value store
+     * into a {@link DefaultLeadershipInfo} instance. This is used when reading current
+     * leader information or watching for leadership changes.
+     * </p>
+     *
+     * @param leadershipInfoValue the JSON string representation of leadership information
+     * @return a {@link LeadershipInfo} object deserialized from the JSON string
+     * @throws NonRecoverableElectionException if the JSON cannot be parsed or is malformed
+     */
     @Override
     public LeadershipInfo convertValue(final String leadershipInfoValue) {
         try {
