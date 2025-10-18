@@ -3,17 +3,17 @@ package com.frogdevelopment.micronaut.consul.leadership.election;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 
 import jakarta.inject.Singleton;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.frogdevelopment.micronaut.consul.leadership.client.DefaultLeadershipInfo;
 import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.serde.ObjectMapper;
 
 /**
  * Default implementation of {@link LeadershipInfoProvider} that creates leadership information
@@ -44,6 +44,8 @@ import io.micronaut.context.env.Environment;
 @Requires(missingBeans = LeadershipInfoProvider.class)
 final class DefaultLeadershipInfoProviderImpl implements LeadershipInfoProvider {
 
+    static final String DEFAULT_VALUE = "n/a";
+
     private final Environment environment;
     private final ObjectMapper objectMapper;
 
@@ -67,8 +69,8 @@ final class DefaultLeadershipInfoProviderImpl implements LeadershipInfoProvider 
     @Override
     public LeadershipInfo getLeadershipInfo(final boolean isAcquire) {
         final var builder = DefaultLeadershipInfo.builder()
-                .hostname(environment.get("hostname", String.class, "n/a"))
-                .clusterName(environment.get("cluster_name", String.class, "n/a"));
+                .hostname(environment.get("hostname", String.class, DEFAULT_VALUE))
+                .clusterName(environment.get("cluster_name", String.class, DEFAULT_VALUE));
         if (isAcquire) {
             builder.acquireDateTime(LocalDateTime.now().toString());
         } else {
@@ -94,7 +96,7 @@ final class DefaultLeadershipInfoProviderImpl implements LeadershipInfoProvider 
         try {
             log.debug("Current leader information: {}", leadershipInfoValue);
             return objectMapper.readValue(leadershipInfoValue, DefaultLeadershipInfo.class);
-        } catch (final JsonProcessingException e) {
+        } catch (final IOException e) {
             throw new NonRecoverableElectionException("Unable to process leadershipInfo value " + leadershipInfoValue, e);
         }
     }
