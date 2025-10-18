@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import jakarta.inject.Named;
@@ -98,9 +99,18 @@ public class LeaderElectionImpl implements LeaderElection {
         log.debug("Applying as leader");
         val mono = createNewSession()
                 .flatMap(this::acquireLeadership)
-                .flatMap(result -> Boolean.TRUE.equals(result) ? handleIsLeader() : handleIsNotLeader());
+                .flatMap(result -> Boolean.TRUE.equals(result) ? handleIsLeader() : handleIsNotLeader())
+                .doOnError(this::onApplyForLeadershipError);
 
         watchForLeadershipInfoChanges(mono);
+    }
+
+    // fixme to check
+    private void onApplyForLeadershipError(final Throwable throwable) {
+        log.error("Leadership application failed", throwable);
+        onError(throwable, delayed -> delayed.then(Mono.fromRunnable(this::applyForLeadership))
+                .subscribeOn(Schedulers.immediate())
+                .subscribe());
     }
 
     Mono<Integer> handleIsLeader() {
@@ -243,25 +253,27 @@ public class LeaderElectionImpl implements LeaderElection {
             watchForLeadershipInfoChanges(Mono.just(this.modifyIndexRef.get()));
         } else {
             log.error("Leadership watch failed", throwable);
+            onError(throwable, delayed -> watchForLeadershipInfoChanges(delayed.thenReturn(this.modifyIndexRef.get())));
+        }
+    }
 
-            if (throwable instanceof NonRecoverableElectionException) {
-                log.error("Non-recoverable error in leadership watch, stopping election participation");
-                immediateStop();
+    private void onError(final Throwable throwable, final Consumer<Mono<Void>> consumer) {
+        if (throwable instanceof NonRecoverableElectionException) {
+            log.error("Non-recoverable error in leadership watch, stopping election participation");
+            immediateStop();
+        } else {
+            final var maxRetries = configuration.getElection().getMaxRetryAttempts();
+            if (retry < maxRetries) {
+                // todo increase each delay at each error + small random value
+                // read https://medium.com/@kandaanusha/retry-mechanism-50dcad27c0c7
+                final var retryDelayMs = configuration.getElection().getRetryDelayMs();
+                final var duration = Duration.ofMillis(retryDelayMs * ++retry);
+                log.warn("Recoverable error detected, retrying watch ({}/{}) after delay={}ms", retry, maxRetries, duration);
+                // Add delay before retrying to avoid hammering the server
+                consumer.accept(Mono.delay(duration).then());
             } else {
-                final var maxRetries = configuration.getElection().getMaxRetryAttempts();
-                if (retry < maxRetries) {
-                    // todo increase each delay at each error + small random value
-                    // read https://medium.com/@kandaanusha/retry-mechanism-50dcad27c0c7
-                    final var retryDelayMs = configuration.getElection().getRetryDelayMs();
-                    final var duration = Duration.ofMillis(retryDelayMs * ++retry);
-                    log.warn("Recoverable error detected, retrying watch ({}/{}) after delay={}ms", retry, maxRetries, duration);
-                    // Add delay before retrying to avoid hammering the server
-                    watchForLeadershipInfoChanges(Mono.delay(duration)
-                            .thenReturn(this.modifyIndexRef.get()));
-                } else {
-                    log.error("Max retry attempts {} reached, stopping election participation", maxRetries);
-                    immediateStop();
-                }
+                log.error("Max retry attempts {} reached, stopping election participation", maxRetries);
+                immediateStop();
             }
         }
     }
