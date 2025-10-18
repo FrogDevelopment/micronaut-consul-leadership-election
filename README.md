@@ -48,38 +48,17 @@ implementation("frog.development.micronaut.consul:leadership-election:1.0.0-SNAP
 
 ## Configuration
 
-Configure the leadership election in your `application.yaml`:
-
-```yaml
-consul:
-  leadership:
-    enabled: true                    # Enable leadership election
-    auto-start.disabled: false       # Disabling starting and stopping election with application
-    token: "your-consul-token"       # Optional: Consul ACL token with required permissions
-    path: "leadership/my-app"        # Consul KV path for leadership coordination
-    election:
-      enabled: true                  # Enable election process
-      session-lock-delay: "5s"       # Lock delay after session destruction
-      session-ttl: "15s"             # Session time-to-live
-      session-renewal-delay: "10s"   # Session renewal frequency
-      max-retry-attempts: "3"        # Maximum number of retry attempts for operations
-      retry-delay-ms: 500            # Retry delay in milliseconds
-      timeout-ms: 3000               # Operation timeout in milliseconds
-```
-
-### Configuration Properties
-
 | Property                                           | Type     | Default                                    | Description                                                                 |
 |----------------------------------------------------|----------|--------------------------------------------|-----------------------------------------------------------------------------|
 | `consul.leadership.enabled`                        | Boolean  | `true`                                     | Enable/disable the leadership election feature                              |
 | `consul.leadership.auto-start.disabled`            | Boolean  | `false`                                    | Enable/disable bounding the leadership election tp application livecycle    |
-| `consul.leadership.token`                          | String   | -                                          | Consul ACL token for authentication                                         |
+| `consul.leadership.token`                          | String   | -                                          | Consul ACL token for authentication with necessary permissions              |
 | `consul.leadership.path`                           | String   | `leadership/${micronaut.application.name}` | Consul KV path for leadership coordination                                  |
 | `consul.leadership.election.enabled`               | Boolean  | `false`                                    | Enable/disable the election process                                         |
 | `consul.leadership.election.session-lock-delay`    | String   | `5s`                                       | Time before a session can acquire a lock after previous session destruction |
 | `consul.leadership.election.session-ttl`           | String   | `15s`                                      | Session time-to-live duration                                               |
 | `consul.leadership.election.session-renewal-delay` | Duration | `10s`                                      | Frequency of session renewal attempts                                       |
-| `consul.leadership.election.max-retry-attempts`    | Integer  | `3`                                        | Frequency of session renewal attempts                                       |
+| `consul.leadership.election.max-retry-attempts`    | Integer  | `3`                                        | Maximum number of retry attempts for operations                             |
 | `consul.leadership.election.retry-delay-ms`        | Integer  | `500`                                      | Delay between retry attempts in milliseconds                                |
 | `consul.leadership.election.timeout-ms`            | Integer  | `3000`                                     | Timeout for Consul operations in milliseconds                               |
 
@@ -272,7 +251,7 @@ flowchart TB
 ;
     start((Start)) --> applyForLeadership[Apply For Leadership]
     applyForLeadership --> createNewSession[Create New Session]
-    createNewSession --> acquireLeadership[Try to acquire Leadership]
+    createNewSession --> acquireLeadership[Acquire Leadership]
     acquireLeadership --> acquireLeadership_result
     acquireLeadership_result{is Leader ?} -- " yes " --> scheduleSessionRenewal
     acquireLeadership_result -- " no " --> destroySession[Destroy Session]
@@ -282,15 +261,19 @@ flowchart TB
     scheduleSessionRenewal --> readLeadershipInfo
     readLeadershipInfo --> watchForLeadership
     scheduleSessionRenewal[Schedule Session renewal] -. scheduled with fixed delay .-> renewSession[[Renew Session]]
-    watchForLeadership ==o onLeadershipChanges>on Changes]
-    watchForLeadership ==o onWatchError>on Error] --> isTimeout{is Timeout ?}
-    isTimeout -- " yes " --> watchForLeadership
-    isTimeout -- " no " --> log[Log error] --> watchForLeadership
+    watchForLeadership ==o onWatchError>on Watch Error] --> isWatchRecoverableError{is Recoverable ?}
+    isWatchRecoverableError -- " yes " --> watchForLeadership
+    isWatchRecoverableError -- " no " --> x((stop))
+    watchForLeadership ==o onLeadershipChanges>on Leadership Changes]
     onLeadershipChanges --> hasData{has Data ?}
     hasData -- " no " --> applyForLeadership
     hasData -- " yes " --> isLockPresent{is Locked ?}
     isLockPresent -- " no " --> applyForLeadership
     isLockPresent -- " yes " --> watchForLeadership
+    createNewSession ==o onError>on Error] --> isRecoverableError{is Recoverable ?}
+    readLeadershipInfo ==o onError
+    isRecoverableError -- " yes " --> applyForLeadership
+    isRecoverableError -- " no " --> x((stop))
 ```
 
 ### Leadership Release Flow
@@ -302,10 +285,12 @@ title: When stopping application
 flowchart TB
 ;
     stop((Stop)) --> stopWatching[Stop Watching Leadership]
-    stopWatching --> cancelSessionRenewal[Cancel Session Renewal]
+    stopWatching --> isLeader{is Leader ?}
+    isLeader -- " no " --> x(((end)))
+    isLeader -- " yes " --> cancelSessionRenewal[Cancel Session Renewal]
     cancelSessionRenewal --> releaseLeadership[Release Leadership]
     releaseLeadership --> destroySession[Destroy Session]
-    destroySession --> x(((end)))
+    destroySession --> x
 ```
 
 ## API Reference
