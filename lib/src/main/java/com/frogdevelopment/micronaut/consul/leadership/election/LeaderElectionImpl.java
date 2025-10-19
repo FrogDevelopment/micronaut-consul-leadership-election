@@ -105,27 +105,6 @@ public class LeaderElectionImpl implements LeaderElection {
         watchForLeadershipInfoChanges(mono);
     }
 
-    // fixme to check
-    private void onApplyForLeadershipError(final Throwable throwable) {
-        log.error("Leadership application failed", throwable);
-        onError(throwable, delayed -> delayed.then(Mono.fromRunnable(this::applyForLeadership))
-                .subscribeOn(Schedulers.immediate())
-                .subscribe());
-    }
-
-    Mono<Integer> handleIsLeader() {
-        log.info("Leadership acquired successfully \uD83C\uDF89 \uD83D\uDC51 \uD83C\uDF89");
-        return scheduleSessionRenewal()
-                // when acquiring leadership, we updated the KV => index has changed
-                .then(Mono.defer(this::readLeadershipInfo));
-    }
-
-    Mono<Integer> handleIsNotLeader() {
-        log.info("Leadership acquisition failed, another leader exists \uD83D\uDE29 \uD83D\uDE2D");
-        return destroySession()
-                .then(Mono.defer(() -> this.modifyIndexRef.get() == null ? readLeadershipInfo() : Mono.just(this.modifyIndexRef.get())));
-    }
-
     private Mono<String> createNewSession() {
         return Mono.fromCallable(sessionProvider::createSession)
                 .flatMap(client::createSession)
@@ -145,6 +124,26 @@ public class LeaderElectionImpl implements LeaderElection {
                             return Mono.just(false);
                         }))
                 .doOnNext(leadershipEventsPublisher::publishLeadershipChangeEvent);
+    }
+
+    Mono<Integer> handleIsLeader() {
+        log.info("Leadership acquired successfully \uD83C\uDF89 \uD83D\uDC51 \uD83C\uDF89");
+        return scheduleSessionRenewal()
+                // when acquiring leadership, we updated the KV => index has changed
+                .then(Mono.defer(this::readLeadershipInfo));
+    }
+
+    Mono<Integer> handleIsNotLeader() {
+        log.info("Leadership acquisition failed, another leader exists \uD83D\uDE29 \uD83D\uDE2D");
+        return destroySession()
+                .then(Mono.defer(() -> this.modifyIndexRef.get() == null ? readLeadershipInfo() : Mono.just(this.modifyIndexRef.get())));
+    }
+
+    private void onApplyForLeadershipError(final Throwable throwable) {
+        log.error("Leadership application failed", throwable);
+        onError(throwable, delayed -> delayed.then(Mono.fromRunnable(this::applyForLeadership))
+                .subscribeOn(Schedulers.immediate())
+                .subscribe());
     }
 
     // when leader, periodically renew the session to avoid expiration
@@ -205,12 +204,25 @@ public class LeaderElectionImpl implements LeaderElection {
                 .flatMap(currentIndex -> {
                     val path = configuration.getPath();
                     log.debug("Watching for leadership changes on path={} with index={}", path, currentIndex);
-                    return client.watchLeadership(path, currentIndex);
+                    return client.watchLeadership(path, currentIndex)
+                            .doOnError(ReadTimeoutException.class, this::onWatchTimeout)
+                            .doOnError(this::onWatchError)
+                            .doOnSuccess(this::onLeadershipChanges);
                 })
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe(this::onLeadershipChanges, this::onWatchError);
+                .subscribeOn(Schedulers.single())
+                .subscribe();
 
         listenerRef.set(disposable);
+    }
+
+    private void onWatchTimeout(final Throwable ignored) {
+        log.debug("Leadership watch timeout, renewing watcher");
+        watchForLeadershipInfoChanges(Mono.just(this.modifyIndexRef.get()));
+    }
+
+    private void onWatchError(final Throwable throwable) {
+        log.error("Leadership watch failed", throwable);
+        onError(throwable, delayed -> watchForLeadershipInfoChanges(delayed.thenReturn(this.modifyIndexRef.get())));
     }
 
     private void onLeadershipChanges(final List<KeyValue> keyValues) {
@@ -245,16 +257,6 @@ public class LeaderElectionImpl implements LeaderElection {
         }
 
         leadershipEventsPublisher.publishLeadershipInfoChange(kv.getValue());
-    }
-
-    private void onWatchError(final Throwable throwable) {
-        if (throwable instanceof ReadTimeoutException) {
-            log.debug("Leadership watch timeout, renewing watcher");
-            watchForLeadershipInfoChanges(Mono.just(this.modifyIndexRef.get()));
-        } else {
-            log.error("Leadership watch failed", throwable);
-            onError(throwable, delayed -> watchForLeadershipInfoChanges(delayed.thenReturn(this.modifyIndexRef.get())));
-        }
     }
 
     private void onError(final Throwable throwable, final Consumer<Mono<Void>> consumer) {
