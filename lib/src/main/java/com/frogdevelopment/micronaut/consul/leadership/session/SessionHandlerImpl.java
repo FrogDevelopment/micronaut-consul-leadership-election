@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
 import java.time.Duration;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -31,6 +32,16 @@ public class SessionHandlerImpl implements SessionHandler {
     private final TaskScheduler taskScheduler;
 
     private final AtomicReference<ScheduledFuture<?>> scheduleRef = new AtomicReference<>();
+
+    // @VisibleForTesting
+    Future<?> getScheduledFuture() {
+        return scheduleRef.get();
+    }
+
+    // @VisibleForTesting
+    void setScheduledFuture(final ScheduledFuture<?> future) {
+        this.scheduleRef.set(future);
+    }
 
     @Override
     public Mono<String> createNewSession() {
@@ -60,11 +71,10 @@ public class SessionHandlerImpl implements SessionHandler {
         });
     }
 
-    private void renewSession(final String sessionId) {
+    // @VisibleForTesting
+    void renewSession(final String sessionId) {
         log.debug("Renewing session {}", sessionId);
-        Mono.justOrEmpty(sessionId)
-                .switchIfEmpty(Mono.error(new IllegalStateException("Attempting to renew session without valid session ID")))
-                .flatMap(client::renewSession)
+        client.renewSession(sessionId)
                 .onErrorResume(throwable -> {
                     log.error("Failed to renew session, this may lead to leadership loss", throwable);
                     return Mono.empty();
