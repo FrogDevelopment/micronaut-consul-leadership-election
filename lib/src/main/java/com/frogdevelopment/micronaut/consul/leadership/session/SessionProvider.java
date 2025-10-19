@@ -1,6 +1,4 @@
-package com.frogdevelopment.micronaut.consul.leadership.election;
-
-import com.frogdevelopment.micronaut.consul.leadership.client.Session;
+package com.frogdevelopment.micronaut.consul.leadership.session;
 
 import io.micronaut.context.annotation.DefaultImplementation;
 

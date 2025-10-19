@@ -2,13 +2,9 @@ package com.frogdevelopment.micronaut.consul.leadership.election;
 
 import lombok.extern.slf4j.Slf4j;
 
-import com.frogdevelopment.micronaut.consul.leadership.LeadershipConfiguration;
-
 import io.micronaut.context.annotation.Prototype;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ShutdownEvent;
 import io.micronaut.context.event.StartupEvent;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.event.annotation.EventListener;
 
 /**
@@ -18,9 +14,6 @@ import io.micronaut.runtime.event.annotation.EventListener;
  */
 @Slf4j
 @Prototype
-@Requires(property = LeadershipConfiguration.PREFIX + ".auto-start.disabled",
-          notEquals = StringUtils.TRUE,
-          defaultValue = StringUtils.FALSE)
 public class ElectionTrigger {
 
     /**

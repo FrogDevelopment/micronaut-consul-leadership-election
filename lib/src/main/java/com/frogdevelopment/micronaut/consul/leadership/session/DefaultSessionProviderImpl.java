@@ -1,4 +1,4 @@
-package com.frogdevelopment.micronaut.consul.leadership.election;
+package com.frogdevelopment.micronaut.consul.leadership.session;
 
 
 import lombok.RequiredArgsConstructor;
@@ -6,7 +6,6 @@ import lombok.RequiredArgsConstructor;
 import jakarta.inject.Singleton;
 
 import com.frogdevelopment.micronaut.consul.leadership.LeadershipConfiguration;
-import com.frogdevelopment.micronaut.consul.leadership.client.Session;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;

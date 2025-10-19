@@ -27,8 +27,9 @@ import com.frogdevelopment.micronaut.consul.leadership.LeadershipConfiguration;
 import com.frogdevelopment.micronaut.consul.leadership.client.ConsulLeadershipClient;
 import com.frogdevelopment.micronaut.consul.leadership.client.KeyValue;
 import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
-import com.frogdevelopment.micronaut.consul.leadership.client.Session;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipEventsPublisher;
+import com.frogdevelopment.micronaut.consul.leadership.session.Session;
+import com.frogdevelopment.micronaut.consul.leadership.session.SessionProvider;
 
 import io.micronaut.scheduling.TaskScheduler;
 import reactor.core.publisher.Mono;

@@ -11,7 +11,7 @@ package com.frogdevelopment.micronaut.consul.leadership.election;
  *
  * @since 1.0.0
  */
-class NonRecoverableElectionException extends RuntimeException {
+public class NonRecoverableElectionException extends RuntimeException {
 
     /**
      * Constructs a new non-recoverable election exception with the specified detail message.
