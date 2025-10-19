@@ -53,10 +53,10 @@ class SessionHandlerImplTest {
         given(session.id()).willReturn("my-session-id");
 
         // when
-        final var result = sessionHandler.createNewSession().block();
+        sessionHandler.createNewSession().block();
 
         // then
-        assertThat(result).isEqualTo("my-session-id");
+        assertThat(sessionHandler.getSessionId()).isEqualTo("my-session-id");
         then(client).shouldHaveNoMoreInteractions();
     }
 
@@ -96,22 +96,37 @@ class SessionHandlerImplTest {
     @Test
     void destroySession_should_call() {
         // given
+        sessionHandler.setSessionId("my-session-id");
         given(client.destroySession("my-session-id")).willReturn(Mono.empty());
 
         // when
-        sessionHandler.destroySession("my-session-id").block();
+        sessionHandler.destroySession().block();
 
         // then
         then(client).shouldHaveNoMoreInteractions();
+        assertThat(sessionHandler.getSessionId()).isNull();
+    }
+
+    @Test
+    void destroySession_should_notCall_when_sessionIdMissing() {
+        // given
+
+        // when
+        sessionHandler.destroySession().block();
+
+        // then
+        then(client).shouldHaveNoInteractions();
+        assertThat(sessionHandler.getSessionId()).isNull();
     }
 
     @Test
     void destroySession_should_continueDespiteError() {
         // given
+        sessionHandler.setSessionId("my-session-id");
         given(client.destroySession("my-session-id")).willReturn(Mono.error(new RuntimeException("boom")));
 
         // when
-        sessionHandler.destroySession("my-session-id").block();
+        sessionHandler.destroySession().block();
 
         // then
         then(client).shouldHaveNoMoreInteractions();
@@ -127,7 +142,7 @@ class SessionHandlerImplTest {
                 .willAnswer(invocation -> scheduledFuture);
 
         // when
-        sessionHandler.scheduleSessionRenewal("my-session-id").block();
+        sessionHandler.scheduleSessionRenewal().block();
 
         // then
         final var actual = sessionHandler.getScheduledFuture();
@@ -139,13 +154,15 @@ class SessionHandlerImplTest {
         // given
         given(configuration.getElection()).willReturn(electionConfiguration);
         given(electionConfiguration.getTimeoutMs()).willReturn(500);
+        sessionHandler.setSessionId("my-session-id");
         given(client.renewSession("my-session-id")).willReturn(Mono.error(new RuntimeException("boom")));
 
         // when
-        sessionHandler.renewSession("my-session-id");
+        sessionHandler.renewSession();
 
         // then
         then(client).shouldHaveNoMoreInteractions();
+        assertThat(sessionHandler.getSessionId()).isEqualTo("my-session-id");
         // todo check logs
     }
 
@@ -154,18 +171,21 @@ class SessionHandlerImplTest {
         // given
         given(configuration.getElection()).willReturn(electionConfiguration);
         given(electionConfiguration.getTimeoutMs()).willReturn(500);
+        sessionHandler.setSessionId("my-session-id");
         given(client.renewSession("my-session-id")).willReturn(Mono.empty());
 
         // when
-        sessionHandler.renewSession("my-session-id");
+        sessionHandler.renewSession();
 
         // then
         then(client).shouldHaveNoMoreInteractions();
+        assertThat(sessionHandler.getSessionId()).isEqualTo("my-session-id");
     }
 
     @Test
     void cancelSessionRenewal_should_cancelScheduledFuture() {
         // given
+        sessionHandler.setSessionId("my-session-id");
         sessionHandler.setScheduledFuture(scheduledFuture);
         given(scheduledFuture.cancel(true)).willReturn(true);
 
@@ -174,11 +194,13 @@ class SessionHandlerImplTest {
 
         //
         then(scheduledFuture).shouldHaveNoMoreInteractions();
+        assertThat(sessionHandler.getScheduledFuture()).isNull();
     }
 
     @Test
     void cancelSessionRenewal_should_logWarning_when_cancellationFails() {
         // given
+        sessionHandler.setSessionId("my-session-id");
         sessionHandler.setScheduledFuture(scheduledFuture);
         given(scheduledFuture.cancel(true)).willReturn(false);
 
@@ -187,6 +209,7 @@ class SessionHandlerImplTest {
 
         //
         then(scheduledFuture).shouldHaveNoMoreInteractions();
+        assertThat(sessionHandler.getScheduledFuture()).isNull();
         // todo check logs
     }
 }

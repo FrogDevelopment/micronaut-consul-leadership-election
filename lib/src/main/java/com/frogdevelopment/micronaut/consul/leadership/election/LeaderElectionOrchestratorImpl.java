@@ -67,7 +67,6 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
     private final LeadershipHandler leadershipHandler;
     private final LeadershipEventsPublisher leadershipEventsPublisher;
 
-    private final AtomicReference<String> sessionIdRef = new AtomicReference<>();
     private final AtomicReference<Integer> modifyIndexRef = new AtomicReference<>();
     private final AtomicReference<Disposable> listenerRef = new AtomicReference<>();
     private final AtomicBoolean closingRef = new AtomicBoolean(false);
@@ -85,7 +84,6 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
     private void applyForLeadership() {
         log.debug("Applying as leader");
         val mono = sessionHandler.createNewSession()
-                .doOnNext(this.sessionIdRef::set)
                 .flatMap(leadershipHandler::acquireLeadership)
                 .flatMap(result -> Boolean.TRUE.equals(result) ? handleIsLeader() : handleIsNotLeader())
                 .doOnError(this::onApplyForLeadershipError);
@@ -93,10 +91,10 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
         watchForLeadershipInfoChanges(mono);
     }
 
-    Mono<Integer> handleIsLeader() {
+    private Mono<Integer> handleIsLeader() {
         log.info("Leadership acquired successfully \uD83C\uDF89 \uD83D\uDC51 \uD83C\uDF89");
         // when leader, periodically renew the session to avoid expiration
-        return sessionHandler.scheduleSessionRenewal(this.sessionIdRef.get())
+        return sessionHandler.scheduleSessionRenewal()
                 // when acquiring leadership, we updated the KV => index has changed
                 .then(Mono.defer(this::readLeadershipInfo));
     }
@@ -106,9 +104,9 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
                 .doOnNext(modifyIndexRef::set);
     }
 
-    Mono<Integer> handleIsNotLeader() {
+    private Mono<Integer> handleIsNotLeader() {
         log.info("Leadership acquisition failed, another leader exists \uD83D\uDE29 \uD83D\uDE2D");
-        return sessionHandler.destroySession(this.sessionIdRef.get())
+        return sessionHandler.destroySession()
                 .then(Mono.defer(() -> Optional.ofNullable(modifyIndexRef.get())
                         .map(Mono::just)
                         .orElse(readLeadershipInfo())));
@@ -121,7 +119,8 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
                 .subscribe());
     }
 
-    private void watchForLeadershipInfoChanges(final Mono<Integer> mono) {
+    // @VisibleForTesting
+    void watchForLeadershipInfoChanges(final Mono<Integer> mono) {
         // Ensure we clean up any previous listener
         val previousListener = listenerRef.get();
         if (previousListener != null && !previousListener.isDisposed()) {
@@ -153,7 +152,8 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
         onError(throwable, delayed -> watchForLeadershipInfoChanges(delayed.thenReturn(this.modifyIndexRef.get())));
     }
 
-    private void onLeadershipChanges(final List<KeyValue> keyValues) {
+    // @VisibleForTesting
+    void onLeadershipChanges(final List<KeyValue> keyValues) {
         if (this.closingRef.get()) {
             log.info("Leadership election is stopping, skipping changes");
             return;
@@ -174,18 +174,11 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
             log.debug("No active session found, attempting to acquire leadership");
             applyForLeadership();
         } else {
-            if (log.isDebugEnabled()) {
-                if (kv.getSession().equals(this.sessionIdRef.get())) {
-                    log.debug("Leadership confirmed - I am the current leader");
-                } else {
-                    log.debug("Another session holds leadership: {}", kv.getSession());
-                }
-            }
             // Continue watching for changes
             watchForLeadershipInfoChanges(Mono.just(kv.getModifyIndex()));
         }
 
-        leadershipEventsPublisher.publishLeadershipInfoChange(kv.getValue());
+        leadershipEventsPublisher.publishLeadershipDetailsChange(kv.getValue());
     }
 
     private void onError(final Throwable throwable, final Consumer<Mono<Void>> consumer) {
@@ -227,28 +220,57 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
         log.info("Stopping Leader Election");
         this.closingRef.set(true);
 
-        return Mono.justOrEmpty(listenerRef.getAndSet(null))
+        return Mono.justOrEmpty(listenerRef.get())
                 .doOnNext(listener -> {
                     log.debug("Stopping leadership watcher");
                     if (!listener.isDisposed()) {
                         listener.dispose();
                     }
-                    modifyIndexRef.set(null);
                 })
                 .then(Mono.defer(sessionHandler::cancelSessionRenewal))
-                .then(Mono.defer(() -> leadershipHandler.releaseLeadership(sessionIdRef.get())))
-                .then(Mono.defer(() -> sessionHandler.destroySession(sessionIdRef.getAndSet(null))))
+                .flatMap(leadershipHandler::releaseLeadership)
+                .then(Mono.defer(sessionHandler::destroySession))
                 .timeout(Duration.ofMillis(configuration.getElection().getTimeoutMs()))// Add timeout to prevent hanging
                 .onErrorResume(throwable -> {
                     log.error("Error during leadership election shutdown", throwable);
 
-                    // force clean-up
-                    sessionIdRef.set(null);
+                    return Mono.empty();
+                })
+                .doOnSuccess(ignored -> log.debug("Leader Election shutdown completed"))
+                .doFinally(ignored -> {
                     listenerRef.set(null);
                     modifyIndexRef.set(null);
-
-                    return Mono.empty();
                 });
+    }
+
+    // @VisibleForTesting
+    Disposable getListener() {
+        return this.listenerRef.get();
+    }
+
+    // @VisibleForTesting
+    void setListener(final Disposable disposable) {
+        this.listenerRef.set(disposable);
+    }
+
+    // @VisibleForTesting
+    Integer getModifyIndex() {
+        return this.modifyIndexRef.get();
+    }
+
+    // @VisibleForTesting
+    void setModifyIndex(final Integer modifyIndex) {
+        this.modifyIndexRef.set(modifyIndex);
+    }
+
+    // @VisibleForTesting
+    boolean getClosing() {
+        return this.closingRef.get();
+    }
+
+    // @VisibleForTesting
+    void setClosing(final Boolean stopping) {
+        this.closingRef.set(stopping);
     }
 
 }

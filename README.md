@@ -65,7 +65,7 @@ implementation("frog.development.micronaut.consul:leadership-election:1.0.0-SNAP
 ### Basic Usage
 
 The leadership election starts automatically when the application context is initialized. You can inject the
-`LeaderElection` service to check leadership status:
+`LeadershipStatus` service to check leadership status:
 
 ```java
 import com.frogdevelopment.micronaut.consul.leadership.status.LeadershipStatus;
@@ -113,19 +113,19 @@ public void onLeadershipChange(final LeadershipChangeEvent event) {
 }
 ```
 
-#### LeadershipInfoChangeEvent
+#### LeadershipDetailsChangeEvent
 
-Fired when the current leader's information changes (new leader elected or leader metadata updated):
+Fired when the current leader's details changes (new leader elected or leader metadata updated):
 
 ```java
-import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipInfoChangeEvent;
+import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipDetailsChangeEvent;
 import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
 
 import io.micronaut.runtime.event.annotation.EventListener;
 
 @EventListener
-public void onLeadershipInfoChange(final LeadershipInfoChangeEvent event) {
-    final LeadershipInfo info = event.leadershipInfo();
+public void onLeadershipInfoDetailsChange(final LeadershipDetailsChangeEvent event) {
+    final LeadershipDetails details = event.leadershipDetails();
     // Access leader details like hostname, cluster name, timestamps, etc.
 }
 ```
@@ -264,22 +264,6 @@ flowchart TB
     destroySession --> x
 ```
 
-## API Reference
-
-### Core Interfaces
-
-- **`LeaderElection`**: Main interface for leadership election operations
-- **`SessionProvider`**: Interface for creating custom Consul session configurations
-- **`LeadershipInfoProvider`**: Interface for providing custom leadership information
-- **`ConsulLeadershipClient`**: HTTP client interface for Consul API interactions
-
-### Key Classes
-
-- **`LeaderElectionImpl`**: Default implementation of leader election using Consul
-- **`DefaultSessionProviderImpl`**: Default session provider with standard configuration
-- **`DefaultLeadershipInfoProviderImpl`**: Default provider for leadership information
-- **`LeadershipConfiguration`**: Configuration properties for the leadership election
-
 ## Best Practices
 
 1. **Session TTL Configuration**: Set the session TTL shorter than your application's expected downtime to ensure quick
@@ -287,7 +271,6 @@ flowchart TB
 2. **Renewal Frequency**: Configure session renewal to occur at least 3 times within the session TTL period
 3. **Lock Delay**: Use appropriate lock delay to prevent rapid leadership changes during network partitions
 4. **Error Handling**: Implement proper error handling in your leadership-dependent code
-5. **Graceful Shutdown**: Always call `leaderElection.stop()` during application shutdown to release leadership cleanly
 
 ## Troubleshooting
 

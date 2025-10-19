@@ -9,7 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetailsDefault;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipChangeEvent;
-import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipInfoChangeEvent;
+import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipDetailsChangeEvent;
 
 @ExtendWith(MockitoExtension.class)
 class LeadershipStatusImplTest {
@@ -36,7 +36,7 @@ class LeadershipStatusImplTest {
         final var leadershipInfo = LeadershipDetailsDefault.builder().build();
 
         // when
-        leadershipStatus.onLeadershipInfoChanged(new LeadershipInfoChangeEvent(leadershipInfo));
+        leadershipStatus.onLeadershipInfoChanged(new LeadershipDetailsChangeEvent(leadershipInfo));
 
         // then
         assertThat(leadershipStatus.geLeadershipInfo()).isEqualTo(leadershipInfo);

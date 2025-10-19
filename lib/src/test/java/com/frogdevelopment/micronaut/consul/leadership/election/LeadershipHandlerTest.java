@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.catchException;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -15,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.frogdevelopment.micronaut.consul.leadership.LeadershipConfiguration;
 import com.frogdevelopment.micronaut.consul.leadership.client.ConsulLeadershipClient;
+import com.frogdevelopment.micronaut.consul.leadership.client.KeyValue;
 import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetails;
 import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetailsProvider;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipEventsPublisher;
@@ -39,6 +42,8 @@ class LeadershipHandlerTest {
 
     @Mock
     private LeadershipDetails leadershipDetails;
+    @Mock
+    private KeyValue keyValue;
 
     @Test
     void acquireLeadership_should_stop_when_getLeadershipInfoFails() {
@@ -90,12 +95,11 @@ class LeadershipHandlerTest {
         assertThat(result).isEqualTo(acquireLeadership);
     }
 
-
     @Test
     void readLeadershipInfo_should_stop_when_readLeadershipFails() {
         // given
         given(configuration.getPath()).willReturn("path");
-        given(client.readLeadership("path")).willThrow(new RuntimeException("boom"));
+        given(client.readLeadership("path")).willReturn(Mono.error(new RuntimeException("boom")));
 
         // when
         final var caught = catchException(() -> leadershipHandler.readLeadershipInfo().block());
@@ -107,6 +111,84 @@ class LeadershipHandlerTest {
                 .hasRootCauseMessage("boom");
         then(client).shouldHaveNoMoreInteractions();
         then(leadershipEventsPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void readLeadershipInfo_should_stop_when_readLeadershipReturnEmpty() {
+        // given
+        given(configuration.getPath()).willReturn("path");
+        given(client.readLeadership("path")).willReturn(Mono.empty());
+
+        // when
+        final var caught = catchException(() -> leadershipHandler.readLeadershipInfo().block());
+
+        // then
+        assertThat(caught).isInstanceOf(NonRecoverableElectionException.class)
+                .hasMessage("No leadership found")
+                .hasRootCause(null);
+        then(client).shouldHaveNoMoreInteractions();
+        then(leadershipEventsPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void readLeadershipInfo_should_stop_when_readLeadershipReturnEmptyKv() {
+        // given
+        given(configuration.getPath()).willReturn("path");
+        given(client.readLeadership("path")).willReturn(Mono.just(List.of()));
+
+        // when
+        final var caught = catchException(() -> leadershipHandler.readLeadershipInfo().block());
+
+        // then
+        assertThat(caught).isInstanceOf(NonRecoverableElectionException.class)
+                .hasMessage("No leadership found")
+                .hasRootCause(null);
+        then(client).shouldHaveNoMoreInteractions();
+        then(leadershipEventsPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void readLeadershipInfo_should_returnModifyIndexAndPublishChange() {
+        // given
+        given(configuration.getPath()).willReturn("path");
+        given(client.readLeadership("path")).willReturn(Mono.just(List.of(keyValue)));
+        given(keyValue.getValue()).willReturn("my-value");
+        given(keyValue.getModifyIndex()).willReturn(666);
+
+        // when
+        final var result = leadershipHandler.readLeadershipInfo().block();
+
+        // then
+        then(client).shouldHaveNoMoreInteractions();
+        then(leadershipEventsPublisher).should().publishLeadershipDetailsChange("my-value");
+        then(leadershipEventsPublisher).shouldHaveNoMoreInteractions();
+        assertThat(result).isEqualTo(666);
+    }
+
+    @Test
+    void releaseLeadership_should_handleQuietlyError() {
+        // given
+        given(leadershipDetailsProvider.getLeadershipInfo(false)).willThrow(new RuntimeException("boom"));
+
+        // when
+        leadershipHandler.releaseLeadership("sessionId").block();
+
+        // then
+        then(client).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void releaseLeadership_should_releaseLeadership() {
+        // given
+        given(leadershipDetailsProvider.getLeadershipInfo(false)).willReturn(leadershipDetails);
+        given(configuration.getPath()).willReturn("path");
+        given(client.releaseLeadership("path", leadershipDetails, "sessionId")).willReturn(Mono.empty());
+
+        // when
+        leadershipHandler.releaseLeadership("sessionId").block();
+
+        // then
+        then(client).shouldHaveNoMoreInteractions();
     }
 
 }

@@ -19,7 +19,7 @@ import com.frogdevelopment.micronaut.consul.leadership.status.LeadershipStatus;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.runtime.server.EmbeddedServer;
 
-// todo
+//@Disabled
 // - start a Consul testcontainer
 // - start at least 3 Micronaut servers (same name) who are going to participate to election
 // - assert 1 got elected
