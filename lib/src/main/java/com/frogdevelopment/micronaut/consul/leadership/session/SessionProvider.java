@@ -17,7 +17,7 @@ import io.micronaut.context.annotation.DefaultImplementation;
  *
  * @since 1.0.0
  */
-@DefaultImplementation(DefaultSessionProviderImpl.class)
+@DefaultImplementation(SessionProviderDefaultImpl.class)
 public interface SessionProvider {
 
     /**

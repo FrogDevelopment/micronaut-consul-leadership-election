@@ -1,6 +1,6 @@
 package com.frogdevelopment.micronaut.consul.leadership.event;
 
-import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
+import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetails;
 
 /**
  * Event published when the current leader's information changes.
@@ -16,13 +16,13 @@ import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
  * <pre>{@code
  * @EventListener
  * void onLeadershipInfoChange(LeadershipInfoChangeEvent event) {
- *     LeadershipInfo info = event.leadershipInfo();
+ *     LeadershipDetails info = event.leadershipDetails();
  *     // Access leader details like hostname, cluster name, etc.
  * }
  * }</pre>
  *
- * @param leadershipInfo the updated leadership information containing details about the current leader
+ * @param leadershipDetails the updated leadership information containing details about the current leader
  * @since 1.0.0
  */
-public record LeadershipInfoChangeEvent(LeadershipInfo leadershipInfo) {
+public record LeadershipInfoChangeEvent(LeadershipDetails leadershipDetails) {
 }

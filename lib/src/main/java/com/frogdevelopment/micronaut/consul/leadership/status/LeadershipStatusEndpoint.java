@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 
 import java.util.Map;
 
+import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetails;
+
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 
@@ -35,7 +37,7 @@ public class LeadershipStatusEndpoint {
      * </p>
      * <ul>
      *   <li>{@code isLeader} - a boolean indicating if this instance is currently the leader</li>
-     *   <li>{@code details} - the {@link com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo}
+     *   <li>{@code details} - the {@link LeadershipDetails}
      *       object containing information about the current leader</li>
      * </ul>
      *

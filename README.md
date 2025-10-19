@@ -184,25 +184,22 @@ public class CustomSessionProvider implements SessionProvider {
 }
 ```
 
-### Custom Leadership Info Provider
+### Custom Leadership Details Provider
 
 Customize the information stored in Consul during leadership operations:
 
 ```java
-import com.frogdevelopment.micronaut.consul.leadership.election.LeadershipInfoProvider;
-import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
-import com.frogdevelopment.micronaut.consul.leadership.client.DefaultLeadershipInfo;
+import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetails;
+import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetailsProvider;
 
 import jakarta.inject.Singleton;
 
-import java.time.LocalDateTime;
-
 @Singleton
-public class CustomLeadershipInfoProvider implements LeadershipInfoProvider {
+public class CustomLeadershipDetailsProvider implements LeadershipDetailsProvider {
 
     @Override
-    public LeadershipInfo getLeadershipInfo(final boolean isAcquire) {
-        return MyLeadershipInfo.builder()
+    public LeadershipDetails getLeadershipInfo(final boolean isAcquire) {
+        return MyLeadershipDetails.builder()
                 .hostname("my-custom-hostname")
                 .clusterName("production-cluster")
                 .provider("GCP")

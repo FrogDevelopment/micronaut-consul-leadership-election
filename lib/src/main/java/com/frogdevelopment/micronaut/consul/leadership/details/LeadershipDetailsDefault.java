@@ -1,4 +1,4 @@
-package com.frogdevelopment.micronaut.consul.leadership.client;
+package com.frogdevelopment.micronaut.consul.leadership.details;
 
 import lombok.Builder;
 import lombok.Value;
@@ -8,7 +8,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.serde.annotation.Serdeable;
 
 /**
- * Default implementation of {@link LeadershipInfo} containing standard leadership metadata.
+ * Default implementation of {@link LeadershipDetails} containing standard leadership metadata.
  * <p>
  * This class holds information about the current or past leader in a distributed
  * leadership election scenario. It includes identification details (hostname, cluster name)
@@ -29,7 +29,7 @@ import io.micronaut.serde.annotation.Serdeable;
 @Builder
 @Serdeable
 @Jacksonized
-public class DefaultLeadershipInfo implements LeadershipInfo {
+public class LeadershipDetailsDefault implements LeadershipDetails {
 
     /**
      * The hostname of the instance holding or having held leadership.

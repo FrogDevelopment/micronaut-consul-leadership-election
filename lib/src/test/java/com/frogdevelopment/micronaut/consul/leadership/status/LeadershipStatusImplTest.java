@@ -7,7 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.frogdevelopment.micronaut.consul.leadership.client.DefaultLeadershipInfo;
+import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetailsDefault;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipChangeEvent;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipInfoChangeEvent;
 
@@ -33,7 +33,7 @@ class LeadershipStatusImplTest {
     void should_listenForLeaderInfoChange() {
         // given
         assertThat(leadershipStatus.geLeadershipInfo()).isNull();
-        final var leadershipInfo = DefaultLeadershipInfo.builder().build();
+        final var leadershipInfo = LeadershipDetailsDefault.builder().build();
 
         // when
         leadershipStatus.onLeadershipInfoChanged(new LeadershipInfoChangeEvent(leadershipInfo));

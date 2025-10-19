@@ -1,4 +1,4 @@
-package com.frogdevelopment.micronaut.consul.leadership.election;
+package com.frogdevelopment.micronaut.consul.leadership.exceptions;
 
 /**
  * Exception thrown when a non-recoverable error occurs during the leadership election process.

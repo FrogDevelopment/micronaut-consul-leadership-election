@@ -1,6 +1,6 @@
-package com.frogdevelopment.micronaut.consul.leadership.election;
+package com.frogdevelopment.micronaut.consul.leadership.details;
 
-import static com.frogdevelopment.micronaut.consul.leadership.election.DefaultLeadershipInfoProviderImpl.DEFAULT_VALUE;
+import static com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetailsProviderDefaultImpl.DEFAULT_VALUE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchException;
 import static org.mockito.BDDMockito.given;
@@ -14,16 +14,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.frogdevelopment.micronaut.consul.leadership.client.DefaultLeadershipInfo;
+import com.frogdevelopment.micronaut.consul.leadership.exceptions.NonRecoverableElectionException;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.serde.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
-class DefaultLeadershipInfoProviderImplTest {
+class LeadershipDetailsProviderDefaultImplTest {
 
     @InjectMocks
-    private DefaultLeadershipInfoProviderImpl defaultLeadershipInfoProvider;
+    private LeadershipDetailsProviderDefaultImpl defaultLeadershipInfoProvider;
 
     @Mock
     private Environment environment;
@@ -40,7 +40,7 @@ class DefaultLeadershipInfoProviderImplTest {
         final var leadershipInfo = defaultLeadershipInfoProvider.getLeadershipInfo(true);
 
         // then
-        assertThat(leadershipInfo).isInstanceOfSatisfying(DefaultLeadershipInfo.class, defaultLeadershipInfo -> {
+        assertThat(leadershipInfo).isInstanceOfSatisfying(LeadershipDetailsDefault.class, defaultLeadershipInfo -> {
             assertThat(defaultLeadershipInfo.getHostname()).isEqualTo("my-hostname");
             assertThat(defaultLeadershipInfo.getClusterName()).isEqualTo("my-cluster_name");
             assertThat(defaultLeadershipInfo.getAcquireDateTime()).isNotNull();
@@ -58,7 +58,7 @@ class DefaultLeadershipInfoProviderImplTest {
         final var leadershipInfo = defaultLeadershipInfoProvider.getLeadershipInfo(false);
 
         // then
-        assertThat(leadershipInfo).isInstanceOfSatisfying(DefaultLeadershipInfo.class, defaultLeadershipInfo -> {
+        assertThat(leadershipInfo).isInstanceOfSatisfying(LeadershipDetailsDefault.class, defaultLeadershipInfo -> {
             assertThat(defaultLeadershipInfo.getHostname()).isEqualTo("my-hostname");
             assertThat(defaultLeadershipInfo.getClusterName()).isEqualTo("my-cluster_name");
             assertThat(defaultLeadershipInfo.getAcquireDateTime()).isNull();
@@ -69,9 +69,9 @@ class DefaultLeadershipInfoProviderImplTest {
     @Test
     void should_convertValue() throws IOException {
         // given
-        final var expected = mock(DefaultLeadershipInfo.class);
+        final var expected = mock(LeadershipDetailsDefault.class);
         final var json = "my_value";
-        given(objectMapper.readValue(json, DefaultLeadershipInfo.class)).willReturn(expected);
+        given(objectMapper.readValue(json, LeadershipDetailsDefault.class)).willReturn(expected);
 
         // when
         final var actual = defaultLeadershipInfoProvider.convertValue(json);
@@ -85,7 +85,7 @@ class DefaultLeadershipInfoProviderImplTest {
         // given
         final var json = "my_value";
         final var ioException = new IOException("boom");
-        given(objectMapper.readValue(json, DefaultLeadershipInfo.class)).willThrow(ioException);
+        given(objectMapper.readValue(json, LeadershipDetailsDefault.class)).willThrow(ioException);
 
         // when
         final var caught = catchException(() -> defaultLeadershipInfoProvider.convertValue(json));
@@ -94,7 +94,7 @@ class DefaultLeadershipInfoProviderImplTest {
         assertThat(caught).isInstanceOf(NonRecoverableElectionException.class)
                 .hasCauseExactlyInstanceOf(IOException.class)
                 .hasRootCauseMessage("boom")
-                .hasMessage("Unable to process leadershipInfo value my_value");
+                .hasMessage("Unable to process leadershipDetails value my_value");
     }
 
 }
