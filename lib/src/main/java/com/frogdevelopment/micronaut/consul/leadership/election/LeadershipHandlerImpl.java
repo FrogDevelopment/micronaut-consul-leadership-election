@@ -49,7 +49,7 @@ public class LeadershipHandlerImpl implements LeadershipHandler {
                 .switchIfEmpty(Mono.error(new NonRecoverableElectionException("No leadership found")))
                 .map(List::getFirst)
                 .map(keyValue -> {
-                    leadershipEventsPublisher.publishLeadershipInfoChange(keyValue.getValue());
+                    leadershipEventsPublisher.publishLeadershipDetailsChange(keyValue.getValue());
 
                     return keyValue.getModifyIndex();
                 });

@@ -31,7 +31,18 @@ public class SessionHandlerImpl implements SessionHandler {
     private final SessionProvider sessionProvider;
     private final TaskScheduler taskScheduler;
 
+    private final AtomicReference<String> sessionIdRef = new AtomicReference<>();
     private final AtomicReference<ScheduledFuture<?>> scheduleRef = new AtomicReference<>();
+
+    // @VisibleForTesting
+    String getSessionId() {
+        return sessionIdRef.get();
+    }
+
+    // @VisibleForTesting
+    void setSessionId(final String sessionId) {
+        this.sessionIdRef.set(sessionId);
+    }
 
     // @VisibleForTesting
     Future<?> getScheduledFuture() {
@@ -48,31 +59,36 @@ public class SessionHandlerImpl implements SessionHandler {
         return Mono.fromCallable(sessionProvider::createSession)
                 .flatMap(client::createSession)
                 .map(Session::id)
+                .doOnNext(sessionIdRef::set)
                 .onErrorResume(error -> Mono.error(new NonRecoverableElectionException("Session creation failed", error)));
     }
 
     @Override
-    public Mono<Void> destroySession(final String sessionId) {
-        log.debug("Destroying session: {}", sessionId);
-        return client.destroySession(sessionId)
-                .onErrorResume(error -> {
-                    log.error("Failed to destroy session: {}", sessionId, error);
-                    return Mono.empty(); // Continue despite destroy failure
+    public Mono<Void> destroySession() {
+        return Mono.justOrEmpty(sessionIdRef.getAndSet(null))
+                .flatMap(sessionId -> {
+                    log.debug("Destroying session: {}", sessionId);
+                    return client.destroySession(sessionId)
+                            .onErrorResume(error -> {
+                                log.error("Failed to destroy session: {}", sessionId, error);
+                                return Mono.empty(); // Continue despite destroy failure
+                            });
                 });
     }
 
     @Override
-    public Mono<Void> scheduleSessionRenewal(final String sessionId) {
+    public Mono<Void> scheduleSessionRenewal() {
         return Mono.fromRunnable(() -> {
             val sessionRenewalDelay = configuration.getElection().getSessionRenewalDelay();
             log.debug("Scheduling session renewal with fixed delay={}", sessionRenewalDelay);
-            val scheduledFuture = taskScheduler.scheduleWithFixedDelay(ZERO, sessionRenewalDelay, () -> renewSession(sessionId));
+            val scheduledFuture = taskScheduler.scheduleWithFixedDelay(ZERO, sessionRenewalDelay, this::renewSession);
             scheduleRef.set(scheduledFuture);
         });
     }
 
     // @VisibleForTesting
-    void renewSession(final String sessionId) {
+    void renewSession() {
+        final var sessionId = sessionIdRef.get();
         log.debug("Renewing session {}", sessionId);
         client.renewSession(sessionId)
                 .onErrorResume(throwable -> {
@@ -85,7 +101,7 @@ public class SessionHandlerImpl implements SessionHandler {
     }
 
     @Override
-    public Mono<Void> cancelSessionRenewal() {
+    public Mono<String> cancelSessionRenewal() {
         return Mono.justOrEmpty(scheduleRef.getAndSet(null))
                 .doOnNext(schedule -> {
                     log.debug("Cancelling session renewal");
@@ -94,7 +110,7 @@ public class SessionHandlerImpl implements SessionHandler {
                         log.warn("Failed to cancel session renewal task");
                     }
                 })
-                .then();
+                .thenReturn(sessionIdRef.get());
     }
 
 }

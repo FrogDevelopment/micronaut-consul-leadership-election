@@ -6,10 +6,10 @@ public interface SessionHandler {
 
     Mono<String> createNewSession();
 
-    Mono<Void> destroySession(String sessionId);
+    Mono<Void> destroySession();
 
-    Mono<Void> scheduleSessionRenewal(String sessionId);
+    Mono<Void> scheduleSessionRenewal();
 
-    Mono<Void> cancelSessionRenewal();
+    Mono<String> cancelSessionRenewal();
 
 }

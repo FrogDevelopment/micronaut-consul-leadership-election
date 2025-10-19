@@ -6,7 +6,7 @@ import jakarta.inject.Singleton;
 
 import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetails;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipChangeEvent;
-import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipInfoChangeEvent;
+import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipDetailsChangeEvent;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.runtime.event.annotation.EventListener;
@@ -15,7 +15,7 @@ import io.micronaut.runtime.event.annotation.EventListener;
  * Implementation of {@link LeadershipStatus} that tracks leadership state via event listeners.
  * <p>
  * This implementation maintains the current leadership status by listening to
- * {@link LeadershipChangeEvent} and {@link LeadershipInfoChangeEvent} published
+ * {@link LeadershipChangeEvent} and {@link LeadershipDetailsChangeEvent} published
  * during the leadership election process. It provides a simple way to query the
  * current leadership state without directly interacting with Consul.
  * </p>
@@ -63,7 +63,7 @@ public class LeadershipStatusImpl implements LeadershipStatus {
     /**
      * Event listener that updates the cached leadership information.
      * <p>
-     * This method is automatically invoked when a {@link LeadershipInfoChangeEvent}
+     * This method is automatically invoked when a {@link LeadershipDetailsChangeEvent}
      * is published, updating the internal cache with the latest information about
      * the current leader. This information can then be queried via {@link #geLeadershipInfo()}.
      * </p>
@@ -71,7 +71,7 @@ public class LeadershipStatusImpl implements LeadershipStatus {
      * @param event the leadership info change event containing updated leader information
      */
     @EventListener
-    public void onLeadershipInfoChanged(@NonNull final LeadershipInfoChangeEvent event) {
+    public void onLeadershipInfoChanged(@NonNull final LeadershipDetailsChangeEvent event) {
         this.leadershipDetails = event.leadershipDetails();
         log.debug("Current leader information: {}", leadershipDetails);
     }

@@ -32,7 +32,7 @@ class LeadershipEventsPublisherTest {
     @Mock
     private ApplicationEventPublisher<LeadershipChangeEvent> leadershipChangeEventPublisher;
     @Mock
-    private ApplicationEventPublisher<LeadershipInfoChangeEvent> leadershipInfoChangeEventPublisher;
+    private ApplicationEventPublisher<LeadershipDetailsChangeEvent> leadershipDetailsChangeEventPublisher;
 
     @Captor
     private ArgumentCaptor<LeadershipChangeEvent> leadershipChangeEventCaptor;
@@ -40,11 +40,11 @@ class LeadershipEventsPublisherTest {
     @Mock
     private LeadershipDetails leadershipDetails;
     @Captor
-    private ArgumentCaptor<LeadershipInfoChangeEvent> leadershipInfoChangeEventCaptor;
+    private ArgumentCaptor<LeadershipDetailsChangeEvent> leadershipDetailsChangeEventCaptor;
 
     @BeforeEach()
     void beforeEach() {
-        leadershipEventsPublisher = new LeadershipEventsPublisher(leadershipDetailsProvider, leadershipChangeEventPublisher, leadershipInfoChangeEventPublisher);
+        leadershipEventsPublisher = new LeadershipEventsPublisher(leadershipDetailsProvider, leadershipChangeEventPublisher, leadershipDetailsChangeEventPublisher);
     }
 
     @ParameterizedTest
@@ -62,18 +62,18 @@ class LeadershipEventsPublisherTest {
     }
 
     @Test
-    void should_publishLeadershipInfoChange() {
+    void should_publishLeadershipDetailsChange() {
         // given
         final var value = "test";
         final var encodedValue = Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
         given(leadershipDetailsProvider.convertValue(value)).willReturn(leadershipDetails);
 
         // when
-        leadershipEventsPublisher.publishLeadershipInfoChange(encodedValue);
+        leadershipEventsPublisher.publishLeadershipDetailsChange(encodedValue);
 
         // then
-        then(leadershipInfoChangeEventPublisher).should().publishEvent(leadershipInfoChangeEventCaptor.capture());
-        final var changeEvent = leadershipInfoChangeEventCaptor.getValue();
+        then(leadershipDetailsChangeEventPublisher).should().publishEvent(leadershipDetailsChangeEventCaptor.capture());
+        final var changeEvent = leadershipDetailsChangeEventCaptor.getValue();
         assertThat(changeEvent.leadershipDetails()).isEqualTo(leadershipDetails);
     }
 

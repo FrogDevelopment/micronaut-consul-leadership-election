@@ -23,7 +23,7 @@ import io.micronaut.context.event.ApplicationEventPublisher;
  * </p>
  * <ul>
  *   <li>{@link LeadershipChangeEvent} - when this instance acquires or loses leadership</li>
- *   <li>{@link LeadershipInfoChangeEvent} - when the current leader's information changes</li>
+ *   <li>{@link LeadershipDetailsChangeEvent} - when the current leader's information changes</li>
  * </ul>
  *
  * @since 1.0.0
@@ -34,7 +34,7 @@ public final class LeadershipEventsPublisher {
 
     private final LeadershipDetailsProvider leadershipDetailsProvider;
     private final ApplicationEventPublisher<LeadershipChangeEvent> leadershipChangeEventPublisher;
-    private final ApplicationEventPublisher<LeadershipInfoChangeEvent> leadershipInfoChangeEventPublisher;
+    private final ApplicationEventPublisher<LeadershipDetailsChangeEvent> leadershipDetailsChangeEventPublisher;
 
     private final Base64.Decoder base64Decoder = Base64.getDecoder();
 
@@ -64,9 +64,9 @@ public final class LeadershipEventsPublisher {
      *
      * @param encodedValue the base64-encoded leadership information from Consul
      */
-    public void publishLeadershipInfoChange(final String encodedValue) {
+    public void publishLeadershipDetailsChange(final String encodedValue) {
         val decodedValue = new String(base64Decoder.decode(encodedValue));
         val leadershipInfo = leadershipDetailsProvider.convertValue(decodedValue);
-        leadershipInfoChangeEventPublisher.publishEvent(new LeadershipInfoChangeEvent(leadershipInfo));
+        leadershipDetailsChangeEventPublisher.publishEvent(new LeadershipDetailsChangeEvent(leadershipInfo));
     }
 }
