@@ -26,7 +26,8 @@ import org.mockito.stubbing.Answer;
 import com.frogdevelopment.micronaut.consul.leadership.LeadershipConfiguration;
 import com.frogdevelopment.micronaut.consul.leadership.client.ConsulLeadershipClient;
 import com.frogdevelopment.micronaut.consul.leadership.client.KeyValue;
-import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
+import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetails;
+import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetailsProvider;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipEventsPublisher;
 import com.frogdevelopment.micronaut.consul.leadership.session.Session;
 import com.frogdevelopment.micronaut.consul.leadership.session.SessionProvider;
@@ -35,7 +36,7 @@ import io.micronaut.scheduling.TaskScheduler;
 import reactor.core.publisher.Mono;
 
 @ExtendWith(MockitoExtension.class)
-class LeaderElectionImplTest {
+class LeaderElectionOrchestratorImplTest {
 
     @Mock
     private ConsulLeadershipClient client;
@@ -50,7 +51,7 @@ class LeaderElectionImplTest {
     private SessionProvider sessionProvider;
 
     @Mock
-    private LeadershipInfoProvider leadershipInfoProvider;
+    private LeadershipDetailsProvider leadershipDetailsProvider;
 
     @Mock
     private TaskScheduler taskScheduler;
@@ -62,13 +63,13 @@ class LeaderElectionImplTest {
     private ScheduledFuture<?> scheduledFuture;
 
     @Mock
-    private LeadershipInfo mockLeadershipInfo;
+    private LeadershipDetails mockLeadershipDetails;
 
     @Mock
     private KeyValue mockKeyValue;
 
     @InjectMocks
-    private LeaderElectionImpl leaderElection;
+    private LeaderElectionOrchestratorImpl leaderElection;
 
     @Captor
     private ArgumentCaptor<Runnable> runnableCaptor;
@@ -100,10 +101,10 @@ class LeaderElectionImplTest {
         given(sessionProvider.createSession()).willReturn(mockSession);
         given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
 
-        given(leadershipInfoProvider.getLeadershipInfo(true)).willReturn(mockLeadershipInfo);
+        given(leadershipDetailsProvider.getLeadershipInfo(true)).willReturn(mockLeadershipDetails);
         final var path = "leadership/test-app";
         given(configuration.getPath()).willReturn(path);
-        given(client.acquireLeadership(path, mockLeadershipInfo, mockSession.id())).willReturn(Mono.just(true));
+        given(client.acquireLeadership(path, mockLeadershipDetails, mockSession.id())).willReturn(Mono.just(true));
 
         given(configuration.getElection()).willReturn(electionConfiguration);
         given(electionConfiguration.getSessionRenewalDelay()).willReturn(Duration.ofSeconds(10));
@@ -126,7 +127,7 @@ class LeaderElectionImplTest {
 
         then(sessionProvider).should().createSession();
         then(client).should().createSession(mockSession);
-        then(client).should().acquireLeadership(path, mockLeadershipInfo, "test-session-id");
+        then(client).should().acquireLeadership(path, mockLeadershipDetails, "test-session-id");
 
         // Then
         given(client.renewSession(mockSession.id())).willReturn(Mono.empty());
@@ -141,10 +142,10 @@ class LeaderElectionImplTest {
         given(sessionProvider.createSession()).willReturn(mockSession);
         given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
 
-        given(leadershipInfoProvider.getLeadershipInfo(true)).willReturn(mockLeadershipInfo);
+        given(leadershipDetailsProvider.getLeadershipInfo(true)).willReturn(mockLeadershipDetails);
         final var path = "leadership/test-app";
         given(configuration.getPath()).willReturn(path);
-        given(client.acquireLeadership(path, mockLeadershipInfo, mockSession.id())).willReturn(Mono.just(false));
+        given(client.acquireLeadership(path, mockLeadershipDetails, mockSession.id())).willReturn(Mono.just(false));
 
         given(client.destroySession(mockSession.id())).willReturn(Mono.empty());
         given(client.readLeadership(path)).willReturn(Mono.just(List.of(mockKeyValue)));
@@ -171,10 +172,10 @@ class LeaderElectionImplTest {
         given(sessionProvider.createSession()).willReturn(mockSession);
         given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
 
-        given(leadershipInfoProvider.getLeadershipInfo(true)).willReturn(mockLeadershipInfo);
+        given(leadershipDetailsProvider.getLeadershipInfo(true)).willReturn(mockLeadershipDetails);
         final var path = "leadership/test-app";
         given(configuration.getPath()).willReturn(path);
-        given(client.acquireLeadership(path, mockLeadershipInfo, mockSession.id())).willReturn(Mono.just(true));
+        given(client.acquireLeadership(path, mockLeadershipDetails, mockSession.id())).willReturn(Mono.just(true));
 
         given(configuration.getElection()).willReturn(electionConfiguration);
         given(electionConfiguration.getSessionRenewalDelay()).willReturn(Duration.ofSeconds(10));
@@ -190,8 +191,8 @@ class LeaderElectionImplTest {
             return Mono.just(List.of(mockKeyValue));
         });
 
-        given(leadershipInfoProvider.getLeadershipInfo(false)).willReturn(mockLeadershipInfo);
-        given(client.releaseLeadership(path, mockLeadershipInfo, mockSession.id())).willReturn(Mono.empty());
+        given(leadershipDetailsProvider.getLeadershipInfo(false)).willReturn(mockLeadershipDetails);
+        given(client.releaseLeadership(path, mockLeadershipDetails, mockSession.id())).willReturn(Mono.empty());
         given(client.destroySession(mockSession.id())).willReturn(Mono.empty());
         given(scheduledFuture.cancel(true)).willReturn(true);
 
@@ -203,7 +204,7 @@ class LeaderElectionImplTest {
         leaderElection.stop();
 
         // Then
-        then(client).should().releaseLeadership(path, mockLeadershipInfo, mockSession.id());
+        then(client).should().releaseLeadership(path, mockLeadershipDetails, mockSession.id());
         then(client).should().destroySession(mockSession.id());
         then(scheduledFuture).should().cancel(true);
     }
@@ -215,10 +216,10 @@ class LeaderElectionImplTest {
         given(sessionProvider.createSession()).willReturn(mockSession);
         given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
 
-        given(leadershipInfoProvider.getLeadershipInfo(true)).willReturn(mockLeadershipInfo);
+        given(leadershipDetailsProvider.getLeadershipInfo(true)).willReturn(mockLeadershipDetails);
         final var path = "leadership/test-app";
         given(configuration.getPath()).willReturn(path);
-        given(client.acquireLeadership(path, mockLeadershipInfo, mockSession.id())).willReturn(Mono.just(false));
+        given(client.acquireLeadership(path, mockLeadershipDetails, mockSession.id())).willReturn(Mono.just(false));
 
         given(client.destroySession(mockSession.id())).willReturn(Mono.empty());
 
@@ -293,7 +294,7 @@ class LeaderElectionImplTest {
 
         given(sessionProvider.createSession()).willReturn(mockSession);
         given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
-        given(leadershipInfoProvider.getLeadershipInfo(true)).willThrow(new RuntimeException("getLeadershipInfo error"));
+        given(leadershipDetailsProvider.getLeadershipInfo(true)).willThrow(new RuntimeException("getLeadershipInfo error"));
 
         given(configuration.getElection()).willReturn(electionConfiguration);
         given(electionConfiguration.getTimeoutMs()).willReturn(1000);
@@ -316,10 +317,10 @@ class LeaderElectionImplTest {
 
         given(sessionProvider.createSession()).willReturn(mockSession);
         given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
-        given(leadershipInfoProvider.getLeadershipInfo(true)).willReturn(mockLeadershipInfo);
+        given(leadershipDetailsProvider.getLeadershipInfo(true)).willReturn(mockLeadershipDetails);
         final var path = "leadership/test-app";
         given(configuration.getPath()).willReturn(path);
-        given(client.acquireLeadership(path, mockLeadershipInfo, mockSession.id()))
+        given(client.acquireLeadership(path, mockLeadershipDetails, mockSession.id()))
                 .willReturn(Mono.error(new RuntimeException("acquireLeadership error")));
 
         given(configuration.getElection()).willReturn(electionConfiguration);
@@ -342,10 +343,10 @@ class LeaderElectionImplTest {
 
         given(sessionProvider.createSession()).willReturn(mockSession);
         given(client.createSession(mockSession)).willReturn(Mono.just(mockSession));
-        given(leadershipInfoProvider.getLeadershipInfo(true)).willReturn(mockLeadershipInfo);
+        given(leadershipDetailsProvider.getLeadershipInfo(true)).willReturn(mockLeadershipDetails);
         final var path = "leadership/test-app";
         given(configuration.getPath()).willReturn(path);
-        given(client.acquireLeadership(path, mockLeadershipInfo, mockSession.id()))
+        given(client.acquireLeadership(path, mockLeadershipDetails, mockSession.id()))
                 .willReturn(Mono.error(new RuntimeException("acquireLeadership error")));
 
         given(client.destroySession(any()))

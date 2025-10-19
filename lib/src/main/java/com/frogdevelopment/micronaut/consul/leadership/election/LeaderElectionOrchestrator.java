@@ -10,7 +10,7 @@ package com.frogdevelopment.micronaut.consul.leadership.election;
  *
  * @since 1.0.0
  */
-public interface LeaderElection {
+public interface LeaderElectionOrchestrator {
 
     /**
      * Starts the leader election process.

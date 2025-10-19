@@ -1,6 +1,6 @@
 package com.frogdevelopment.micronaut.consul.leadership.status;
 
-import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
+import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetails;
 
 import io.micronaut.core.annotation.Nullable;
 
@@ -24,5 +24,5 @@ public interface LeadershipStatus {
      * @return the current leadership information, or {@code null} if no leader information is available yet
      */
     @Nullable
-    LeadershipInfo geLeadershipInfo();
+    LeadershipDetails geLeadershipInfo();
 }

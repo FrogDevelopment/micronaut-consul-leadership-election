@@ -18,7 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.frogdevelopment.micronaut.consul.leadership.LeadershipConfiguration;
 import com.frogdevelopment.micronaut.consul.leadership.client.ConsulLeadershipClient;
-import com.frogdevelopment.micronaut.consul.leadership.election.NonRecoverableElectionException;
+import com.frogdevelopment.micronaut.consul.leadership.exceptions.NonRecoverableElectionException;
 
 import io.micronaut.scheduling.TaskScheduler;
 import reactor.core.publisher.Mono;

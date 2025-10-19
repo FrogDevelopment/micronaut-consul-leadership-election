@@ -1,4 +1,4 @@
-package com.frogdevelopment.micronaut.consul.leadership.client;
+package com.frogdevelopment.micronaut.consul.leadership.details;
 
 /**
  * Marker interface for leadership information objects.
@@ -13,8 +13,8 @@ package com.frogdevelopment.micronaut.consul.leadership.client;
  * operations and can be retrieved by all instances to identify the current leader.
  * </p>
  *
- * @see DefaultLeadershipInfo
+ * @see LeadershipDetailsDefault
  * @since 1.0.0
  */
-public interface LeadershipInfo {
+public interface LeadershipDetails {
 }

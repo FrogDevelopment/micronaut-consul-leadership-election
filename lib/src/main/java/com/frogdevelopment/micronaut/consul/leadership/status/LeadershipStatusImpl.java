@@ -4,7 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import jakarta.inject.Singleton;
 
-import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
+import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetails;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipChangeEvent;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipInfoChangeEvent;
 
@@ -32,7 +32,7 @@ import io.micronaut.runtime.event.annotation.EventListener;
 public class LeadershipStatusImpl implements LeadershipStatus {
 
     private boolean isLeader;
-    private LeadershipInfo leadershipInfo;
+    private LeadershipDetails leadershipDetails;
 
     @Override
     public boolean isLeader() {
@@ -40,8 +40,8 @@ public class LeadershipStatusImpl implements LeadershipStatus {
     }
 
     @Override
-    public LeadershipInfo geLeadershipInfo() {
-        return leadershipInfo;
+    public LeadershipDetails geLeadershipInfo() {
+        return leadershipDetails;
     }
 
     /**
@@ -72,8 +72,8 @@ public class LeadershipStatusImpl implements LeadershipStatus {
      */
     @EventListener
     public void onLeadershipInfoChanged(@NonNull final LeadershipInfoChangeEvent event) {
-        this.leadershipInfo = event.leadershipInfo();
-        log.debug("Current leader information: {}", leadershipInfo);
+        this.leadershipDetails = event.leadershipDetails();
+        log.debug("Current leader information: {}", leadershipDetails);
     }
 
 }

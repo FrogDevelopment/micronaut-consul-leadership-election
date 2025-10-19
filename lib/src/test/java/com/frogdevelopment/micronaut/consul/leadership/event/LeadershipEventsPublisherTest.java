@@ -17,8 +17,8 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
-import com.frogdevelopment.micronaut.consul.leadership.election.LeadershipInfoProvider;
+import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetails;
+import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetailsProvider;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
 
@@ -28,7 +28,7 @@ class LeadershipEventsPublisherTest {
     private LeadershipEventsPublisher leadershipEventsPublisher;
 
     @Mock
-    private LeadershipInfoProvider leadershipInfoProvider;
+    private LeadershipDetailsProvider leadershipDetailsProvider;
     @Mock
     private ApplicationEventPublisher<LeadershipChangeEvent> leadershipChangeEventPublisher;
     @Mock
@@ -38,13 +38,13 @@ class LeadershipEventsPublisherTest {
     private ArgumentCaptor<LeadershipChangeEvent> leadershipChangeEventCaptor;
 
     @Mock
-    private LeadershipInfo leadershipInfo;
+    private LeadershipDetails leadershipDetails;
     @Captor
     private ArgumentCaptor<LeadershipInfoChangeEvent> leadershipInfoChangeEventCaptor;
 
     @BeforeEach()
     void beforeEach() {
-        leadershipEventsPublisher = new LeadershipEventsPublisher(leadershipInfoProvider, leadershipChangeEventPublisher, leadershipInfoChangeEventPublisher);
+        leadershipEventsPublisher = new LeadershipEventsPublisher(leadershipDetailsProvider, leadershipChangeEventPublisher, leadershipInfoChangeEventPublisher);
     }
 
     @ParameterizedTest
@@ -66,7 +66,7 @@ class LeadershipEventsPublisherTest {
         // given
         final var value = "test";
         final var encodedValue = Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
-        given(leadershipInfoProvider.convertValue(value)).willReturn(leadershipInfo);
+        given(leadershipDetailsProvider.convertValue(value)).willReturn(leadershipDetails);
 
         // when
         leadershipEventsPublisher.publishLeadershipInfoChange(encodedValue);
@@ -74,7 +74,7 @@ class LeadershipEventsPublisherTest {
         // then
         then(leadershipInfoChangeEventPublisher).should().publishEvent(leadershipInfoChangeEventCaptor.capture());
         final var changeEvent = leadershipInfoChangeEventCaptor.getValue();
-        assertThat(changeEvent.leadershipInfo()).isEqualTo(leadershipInfo);
+        assertThat(changeEvent.leadershipDetails()).isEqualTo(leadershipDetails);
     }
 
 }

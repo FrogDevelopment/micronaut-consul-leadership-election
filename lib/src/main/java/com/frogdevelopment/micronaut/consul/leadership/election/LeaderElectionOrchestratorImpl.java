@@ -18,6 +18,7 @@ import com.frogdevelopment.micronaut.consul.leadership.LeadershipConfiguration;
 import com.frogdevelopment.micronaut.consul.leadership.client.ConsulLeadershipClient;
 import com.frogdevelopment.micronaut.consul.leadership.client.KeyValue;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipEventsPublisher;
+import com.frogdevelopment.micronaut.consul.leadership.exceptions.NonRecoverableElectionException;
 import com.frogdevelopment.micronaut.consul.leadership.session.SessionHandler;
 
 import io.micronaut.core.annotation.Blocking;
@@ -29,7 +30,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 /**
- * Default implementation of {@link LeaderElection} using Consul for distributed leadership election.
+ * Default implementation of {@link LeaderElectionOrchestrator} using Consul for distributed leadership election.
  * <p>
  * This class implements a robust leader election algorithm using Consul's session-based locking
  * mechanism. It handles the complete lifecycle of leadership election including:
@@ -58,7 +59,7 @@ import reactor.core.scheduler.Schedulers;
 @Slf4j
 @Singleton
 @RequiredArgsConstructor
-public class LeaderElectionImpl implements LeaderElection {
+public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrator {
 
     private final ConsulLeadershipClient client;
     private final LeadershipConfiguration configuration;

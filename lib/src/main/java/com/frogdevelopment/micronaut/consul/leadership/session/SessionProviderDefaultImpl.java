@@ -37,7 +37,7 @@ import io.micronaut.context.env.Environment;
 @Singleton
 @RequiredArgsConstructor
 @Requires(missingBeans = SessionProvider.class)
-final class DefaultSessionProviderImpl implements SessionProvider {
+final class SessionProviderDefaultImpl implements SessionProvider {
 
     private final Environment environment;
     private final LeadershipConfiguration configuration;

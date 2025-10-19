@@ -1,27 +1,25 @@
-package com.frogdevelopment.micronaut.consul.leadership.election;
-
-import com.frogdevelopment.micronaut.consul.leadership.client.LeadershipInfo;
+package com.frogdevelopment.micronaut.consul.leadership.details;
 
 import io.micronaut.context.annotation.DefaultImplementation;
 
 /**
- * Provider interface for creating leadership information objects.
+ * Provider interface for creating leadership details objects.
  * <p>
- * This interface abstracts the creation of leadership information that gets
+ * This interface abstracts the creation of leadership details that gets
  * stored in Consul's key-value store during leadership acquisition and release.
- * The leadership information typically contains details about the current leader
+ * The leadership details typically contains details about the current leader
  * instance, such as instance ID, hostname, startup time, and other identifying
  * information.
  * </p>
  * <p>
- * The default implementation provides standard leadership information based on
+ * The default implementation provides standard leadership details based on
  * the current application instance and runtime environment.
  * </p>
  *
  * @since 1.0.0
  */
-@DefaultImplementation(DefaultLeadershipInfoProviderImpl.class)
-public interface LeadershipInfoProvider {
+@DefaultImplementation(LeadershipDetailsProviderDefaultImpl.class)
+public interface LeadershipDetailsProvider {
 
     /**
      * Creates leadership information for the current instance.
@@ -36,7 +34,7 @@ public interface LeadershipInfoProvider {
      *                  {@code false} if this is for releasing leadership
      * @return the leadership information object to store in Consul
      */
-    LeadershipInfo getLeadershipInfo(boolean isAcquire);
+    LeadershipDetails getLeadershipInfo(boolean isAcquire);
 
-    LeadershipInfo convertValue(String encodedValue);
+    LeadershipDetails convertValue(String encodedValue);
 }

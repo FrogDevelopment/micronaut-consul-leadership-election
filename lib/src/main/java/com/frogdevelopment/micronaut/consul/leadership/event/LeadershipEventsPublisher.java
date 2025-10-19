@@ -5,7 +5,7 @@ import lombok.val;
 
 import java.util.Base64;
 
-import com.frogdevelopment.micronaut.consul.leadership.election.LeadershipInfoProvider;
+import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetailsProvider;
 
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.event.ApplicationEventPublisher;
@@ -32,7 +32,7 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 @RequiredArgsConstructor
 public final class LeadershipEventsPublisher {
 
-    private final LeadershipInfoProvider leadershipInfoProvider;
+    private final LeadershipDetailsProvider leadershipDetailsProvider;
     private final ApplicationEventPublisher<LeadershipChangeEvent> leadershipChangeEventPublisher;
     private final ApplicationEventPublisher<LeadershipInfoChangeEvent> leadershipInfoChangeEventPublisher;
 
@@ -66,7 +66,7 @@ public final class LeadershipEventsPublisher {
      */
     public void publishLeadershipInfoChange(final String encodedValue) {
         val decodedValue = new String(base64Decoder.decode(encodedValue));
-        val leadershipInfo = leadershipInfoProvider.convertValue(decodedValue);
+        val leadershipInfo = leadershipDetailsProvider.convertValue(decodedValue);
         leadershipInfoChangeEventPublisher.publishEvent(new LeadershipInfoChangeEvent(leadershipInfo));
     }
 }

@@ -9,7 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.frogdevelopment.micronaut.consul.leadership.client.DefaultLeadershipInfo;
+import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetailsDefault;
 
 @ExtendWith(MockitoExtension.class)
 class LeadershipStatusEndpointTest {
@@ -24,7 +24,7 @@ class LeadershipStatusEndpointTest {
     void should_return_details() {
         // given
         given(leadershipStatus.isLeader()).willReturn(true);
-        final var leadershipInfo = DefaultLeadershipInfo.builder()
+        final var leadershipInfo = LeadershipDetailsDefault.builder()
                 .hostname("hostname")
                 .clusterName("cluster")
                 .acquireDateTime("my-date")
