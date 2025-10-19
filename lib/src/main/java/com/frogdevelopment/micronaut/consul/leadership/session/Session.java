@@ -1,4 +1,4 @@
-package com.frogdevelopment.micronaut.consul.leadership.client;
+package com.frogdevelopment.micronaut.consul.leadership.session;
 
 import lombok.Builder;
 import lombok.extern.jackson.Jacksonized;

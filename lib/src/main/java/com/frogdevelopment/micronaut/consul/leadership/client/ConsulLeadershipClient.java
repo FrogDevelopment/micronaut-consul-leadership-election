@@ -5,6 +5,7 @@ import java.util.List;
 import jakarta.validation.constraints.NotBlank;
 
 import com.frogdevelopment.micronaut.consul.leadership.LeadershipConfiguration;
+import com.frogdevelopment.micronaut.consul.leadership.session.Session;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.discovery.consul.client.v1.ConsulClient;

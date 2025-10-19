@@ -51,10 +51,8 @@ implementation("frog.development.micronaut.consul:leadership-election:1.0.0-SNAP
 | Property                                           | Type     | Default                                    | Description                                                                 |
 |----------------------------------------------------|----------|--------------------------------------------|-----------------------------------------------------------------------------|
 | `consul.leadership.enabled`                        | Boolean  | `true`                                     | Enable/disable the leadership election feature                              |
-| `consul.leadership.auto-start.disabled`            | Boolean  | `false`                                    | Enable/disable bounding the leadership election tp application livecycle    |
 | `consul.leadership.token`                          | String   | -                                          | Consul ACL token for authentication with necessary permissions              |
 | `consul.leadership.path`                           | String   | `leadership/${micronaut.application.name}` | Consul KV path for leadership coordination                                  |
-| `consul.leadership.election.enabled`               | Boolean  | `false`                                    | Enable/disable the election process                                         |
 | `consul.leadership.election.session-lock-delay`    | String   | `5s`                                       | Time before a session can acquire a lock after previous session destruction |
 | `consul.leadership.election.session-ttl`           | String   | `15s`                                      | Session time-to-live duration                                               |
 | `consul.leadership.election.session-renewal-delay` | Duration | `10s`                                      | Frequency of session renewal attempts                                       |
@@ -160,30 +158,6 @@ This endpoint is useful for:
 - Load balancer routing decisions
 - Operational dashboards
 - External system integration
-
-### Manual Control
-
-You can manually start and stop the leadership election process by set configuration
-`consul.leadership.auto-start.disabled=true` :
-
-```java
-
-@Inject
-private LeaderElection leaderElection;
-
-// Start leadership election
-leaderElection.
-
-start();
-
-// Check if this instance is the leader
-boolean isLeader = leaderElection.isLeader();
-
-// Stop leadership election and release leadership if held
-leaderElection.
-
-stop();
-```
 
 ### Custom Session Provider
 

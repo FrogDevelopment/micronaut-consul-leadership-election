@@ -1,35 +1,28 @@
 package com.frogdevelopment.micronaut.consul.leadership.election;
 
-import static java.time.Duration.ZERO;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.ScheduledFuture;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
-import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 import com.frogdevelopment.micronaut.consul.leadership.LeadershipConfiguration;
 import com.frogdevelopment.micronaut.consul.leadership.client.ConsulLeadershipClient;
 import com.frogdevelopment.micronaut.consul.leadership.client.KeyValue;
-import com.frogdevelopment.micronaut.consul.leadership.client.Session;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipEventsPublisher;
+import com.frogdevelopment.micronaut.consul.leadership.session.SessionHandler;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.discovery.consul.condition.RequiresConsul;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
-import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.scheduling.TaskScheduler;
 import io.micronaut.scheduling.annotation.Async;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
@@ -64,79 +57,60 @@ import reactor.core.scheduler.Schedulers;
  */
 @Slf4j
 @Singleton
-@RequiresConsul
 @RequiredArgsConstructor
-@Requires(property = LeadershipConfiguration.PREFIX + ".election.enabled",
-          notEquals = StringUtils.FALSE,
-          defaultValue = StringUtils.TRUE)
 public class LeaderElectionImpl implements LeaderElection {
 
     private final ConsulLeadershipClient client;
     private final LeadershipConfiguration configuration;
-    private final SessionProvider sessionProvider;
-    private final LeadershipInfoProvider leadershipInfoProvider;
-    @Named(TaskExecutors.SCHEDULED)
-    private final TaskScheduler taskScheduler;
+    private final SessionHandler sessionHandler;
+    private final LeadershipHandler leadershipHandler;
     private final LeadershipEventsPublisher leadershipEventsPublisher;
 
+    private final AtomicReference<String> sessionIdRef = new AtomicReference<>();
     private final AtomicReference<Integer> modifyIndexRef = new AtomicReference<>();
     private final AtomicReference<Disposable> listenerRef = new AtomicReference<>();
-    private final AtomicReference<String> sessionIdRef = new AtomicReference<>();
-    private final AtomicReference<ScheduledFuture<?>> scheduleRef = new AtomicReference<>();
-
-    private boolean stopping;
-    private long retry = 0;
+    private final AtomicBoolean closingRef = new AtomicBoolean(false);
+    private final AtomicLong retryCount = new AtomicLong();
 
     @Async
     @Override
     public void start() {
-        this.stopping = false;
         log.debug("Starting Leader Election");
+        this.closingRef.set(false);
+        this.retryCount.set(0);
         applyForLeadership();
     }
 
     private void applyForLeadership() {
         log.debug("Applying as leader");
-        val mono = createNewSession()
-                .flatMap(this::acquireLeadership)
+        val mono = sessionHandler.createNewSession()
+                .doOnNext(this.sessionIdRef::set)
+                .flatMap(leadershipHandler::acquireLeadership)
                 .flatMap(result -> Boolean.TRUE.equals(result) ? handleIsLeader() : handleIsNotLeader())
                 .doOnError(this::onApplyForLeadershipError);
 
         watchForLeadershipInfoChanges(mono);
     }
 
-    private Mono<String> createNewSession() {
-        return Mono.fromCallable(sessionProvider::createSession)
-                .flatMap(client::createSession)
-                .map(Session::id)
-                .doOnNext(sessionIdRef::set)
-                .onErrorResume(error -> Mono.error(new NonRecoverableElectionException("Session creation failed", error)));
-    }
-
-    Mono<Boolean> acquireLeadership(final String sessionId) {
-        log.debug("Attempting to acquire leadership");
-
-        return Mono.fromCallable(() -> leadershipInfoProvider.getLeadershipInfo(true))
-                .onErrorResume(error -> Mono.error(new NonRecoverableElectionException("LeadershipInfo creation failed", error)))
-                .flatMap(leadershipInfo -> client.acquireLeadership(configuration.getPath(), leadershipInfo, sessionId)
-                        .onErrorResume(error -> {
-                            log.error("Leadership acquisition failed", error);
-                            return Mono.just(false);
-                        }))
-                .doOnNext(leadershipEventsPublisher::publishLeadershipChangeEvent);
-    }
-
     Mono<Integer> handleIsLeader() {
         log.info("Leadership acquired successfully \uD83C\uDF89 \uD83D\uDC51 \uD83C\uDF89");
-        return scheduleSessionRenewal()
+        // when leader, periodically renew the session to avoid expiration
+        return sessionHandler.scheduleSessionRenewal(this.sessionIdRef.get())
                 // when acquiring leadership, we updated the KV => index has changed
                 .then(Mono.defer(this::readLeadershipInfo));
     }
 
+    private Mono<Integer> readLeadershipInfo() {
+        return leadershipHandler.readLeadershipInfo()
+                .doOnNext(modifyIndexRef::set);
+    }
+
     Mono<Integer> handleIsNotLeader() {
         log.info("Leadership acquisition failed, another leader exists \uD83D\uDE29 \uD83D\uDE2D");
-        return destroySession()
-                .then(Mono.defer(() -> this.modifyIndexRef.get() == null ? readLeadershipInfo() : Mono.just(this.modifyIndexRef.get())));
+        return sessionHandler.destroySession(this.sessionIdRef.get())
+                .then(Mono.defer(() -> Optional.ofNullable(modifyIndexRef.get())
+                        .map(Mono::just)
+                        .orElse(readLeadershipInfo())));
     }
 
     private void onApplyForLeadershipError(final Throwable throwable) {
@@ -144,53 +118,6 @@ public class LeaderElectionImpl implements LeaderElection {
         onError(throwable, delayed -> delayed.then(Mono.fromRunnable(this::applyForLeadership))
                 .subscribeOn(Schedulers.immediate())
                 .subscribe());
-    }
-
-    // when leader, periodically renew the session to avoid expiration
-    private Mono<Void> scheduleSessionRenewal() {
-        return Mono.fromRunnable(() -> {
-            val sessionRenewalDelay = configuration.getElection().getSessionRenewalDelay();
-            log.debug("Scheduling session renewal with fixed delay={}", sessionRenewalDelay);
-            val scheduledFuture = taskScheduler.scheduleWithFixedDelay(ZERO, sessionRenewalDelay, this::renewSession);
-            scheduleRef.set(scheduledFuture);
-        });
-    }
-
-    private void renewSession() {
-        val sessionId = sessionIdRef.get();
-        if (sessionId != null) {
-            log.debug("Renewing session: {}", sessionId);
-            client.renewSession(sessionId)
-                    .onErrorResume(error -> {
-                        log.error("Failed to renew session {}, this may lead to leadership loss", sessionId, error);
-                        return Mono.error(new RuntimeException("Session renewal failed", error));
-                    })
-                    .timeout(getTimeout()) // Add timeout to prevent hanging
-                    .block();
-        } else {
-            log.warn("Attempting to renew session without valid session ID");
-        }
-    }
-
-    private Duration getTimeout() {
-        return Duration.ofMillis(configuration.getElection().getTimeoutMs());
-    }
-
-    private Mono<Integer> readLeadershipInfo() {
-        log.debug("Reading leadership information from path: {}", configuration.getPath());
-        return client.readLeadership(configuration.getPath())
-                .onErrorResume(error -> Mono.error(new NonRecoverableElectionException("Failed to read leadership information", error)))
-                .filter(Predicate.not(List::isEmpty))
-                .switchIfEmpty(Mono.error(new NonRecoverableElectionException("No leadership found")))
-                .map(List::getFirst)
-                .map(keyValue -> {
-                    leadershipEventsPublisher.publishLeadershipInfoChange(keyValue.getValue());
-
-                    final var modifyIndex = keyValue.getModifyIndex();
-                    this.modifyIndexRef.set(modifyIndex);
-
-                    return modifyIndex;
-                });
     }
 
     private void watchForLeadershipInfoChanges(final Mono<Integer> mono) {
@@ -226,7 +153,7 @@ public class LeaderElectionImpl implements LeaderElection {
     }
 
     private void onLeadershipChanges(final List<KeyValue> keyValues) {
-        if (this.stopping) {
+        if (this.closingRef.get()) {
             log.info("Leadership election is stopping, skipping changes");
             return;
         }
@@ -246,11 +173,12 @@ public class LeaderElectionImpl implements LeaderElection {
             log.debug("No active session found, attempting to acquire leadership");
             applyForLeadership();
         } else {
-            val currentSessionId = sessionIdRef.get();
-            if (kv.getSession().equals(currentSessionId)) {
-                log.debug("Leadership confirmed - I am the current leader");
-            } else {
-                log.debug("Another session holds leadership: {}", kv.getSession());
+            if (log.isDebugEnabled()) {
+                if (kv.getSession().equals(this.sessionIdRef.get())) {
+                    log.debug("Leadership confirmed - I am the current leader");
+                } else {
+                    log.debug("Another session holds leadership: {}", kv.getSession());
+                }
             }
             // Continue watching for changes
             watchForLeadershipInfoChanges(Mono.just(kv.getModifyIndex()));
@@ -265,11 +193,12 @@ public class LeaderElectionImpl implements LeaderElection {
             immediateStop();
         } else {
             final var maxRetries = configuration.getElection().getMaxRetryAttempts();
-            if (retry < maxRetries) {
+            final var retry = this.retryCount.incrementAndGet();
+            if (retry <= maxRetries) {
                 // todo increase each delay at each error + small random value
                 // read https://medium.com/@kandaanusha/retry-mechanism-50dcad27c0c7
                 final var retryDelayMs = configuration.getElection().getRetryDelayMs();
-                final var duration = Duration.ofMillis(retryDelayMs * ++retry);
+                final var duration = Duration.ofMillis(retryDelayMs * retry);
                 log.warn("Recoverable error detected, retrying watch ({}/{}) after delay={}ms", retry, maxRetries, duration);
                 // Add delay before retrying to avoid hammering the server
                 consumer.accept(Mono.delay(duration).then());
@@ -291,32 +220,12 @@ public class LeaderElectionImpl implements LeaderElection {
         doStop()
                 .subscribeOn(Schedulers.immediate())
                 .subscribe();
-
     }
 
     private Mono<Void> doStop() {
         log.info("Stopping Leader Election");
-        this.stopping = true;
+        this.closingRef.set(true);
 
-        return stopWatching()
-                .then(Mono.defer(this::cancelSessionRenewal))
-                .then(Mono.defer(this::releaseLeadership))
-                .then(Mono.defer(this::destroySession))
-                .timeout(getTimeout())// Add timeout to prevent hanging
-                .onErrorResume(throwable -> {
-                    log.error("Error during leadership election shutdown", throwable);
-
-                    // force clean-up
-                    modifyIndexRef.set(null);
-                    listenerRef.set(null);
-                    scheduleRef.set(null);
-                    sessionIdRef.set(null);
-
-                    return Mono.empty();
-                });
-    }
-
-    private Mono<Void> stopWatching() {
         return Mono.justOrEmpty(listenerRef.getAndSet(null))
                 .doOnNext(listener -> {
                     log.debug("Stopping leadership watcher");
@@ -325,44 +234,20 @@ public class LeaderElectionImpl implements LeaderElection {
                     }
                     modifyIndexRef.set(null);
                 })
-                .then();
-    }
+                .then(Mono.defer(sessionHandler::cancelSessionRenewal))
+                .then(Mono.defer(() -> leadershipHandler.releaseLeadership(sessionIdRef.get())))
+                .then(Mono.defer(() -> sessionHandler.destroySession(sessionIdRef.getAndSet(null))))
+                .timeout(Duration.ofMillis(configuration.getElection().getTimeoutMs()))// Add timeout to prevent hanging
+                .onErrorResume(throwable -> {
+                    log.error("Error during leadership election shutdown", throwable);
 
-    private Mono<Void> cancelSessionRenewal() {
-        return Mono.justOrEmpty(scheduleRef.getAndSet(null))
-                .doOnNext(schedule -> {
-                    log.debug("Cancelling session renewal");
-                    final boolean cancelled = schedule.cancel(true);
-                    if (!cancelled) {
-                        log.warn("Failed to cancel session renewal task");
-                    }
-                })
-                .then();
-    }
+                    // force clean-up
+                    sessionIdRef.set(null);
+                    listenerRef.set(null);
+                    modifyIndexRef.set(null);
 
-    private Mono<Void> releaseLeadership() {
-        return Mono.justOrEmpty(sessionIdRef.get())
-                .flatMap(sessionId -> {
-                    log.debug("Releasing leadership");
-                    return Mono.fromCallable(() -> leadershipInfoProvider.getLeadershipInfo(false))
-                            .flatMap(leadershipInfo -> client.releaseLeadership(configuration.getPath(), leadershipInfo, sessionId))
-                            .onErrorResume(error -> {
-                                log.error("Failed to release leadership gracefully", error);
-                                return Mono.empty(); // Continue cleanup despite release failure
-                            });
+                    return Mono.empty();
                 });
     }
 
-    private Mono<Void> destroySession() {
-        return Mono.justOrEmpty(sessionIdRef.getAndSet(null))
-                .flatMap(sessionId -> {
-                    log.debug("Destroying session: {}", sessionId);
-                    return client.destroySession(sessionId)
-                            .onErrorResume(error -> {
-                                log.error("Failed to destroy session: {}", sessionId, error);
-                                return Mono.empty(); // Continue despite destroy failure
-                            });
-
-                });
-    }
 }
