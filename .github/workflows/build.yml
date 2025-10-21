@@ -1,0 +1,59 @@
+name: Java CI
+
+on:
+  push:
+    branches: [ "**" ]
+  release:
+    types: [ created ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v5
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Compile
+        run: ./gradlew classes
+
+      - name: Test
+        run: ./gradlew test
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: build/test-results/**/*.xml
+
+      - name: Generate package
+        run: ./gradlew publish
+
+#  publish:
+#    needs: build
+#    runs-on: ubuntu-latest
+#    permissions:
+#      contents: read
+#
+#    steps:
+#      - name: Deploy released package in MavenCentral
+#        if: startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/tags/')
+#        run: ./gradlew jreleaserDeploy
+#        env:
+#          JRELEASER_MAVENCENTRAL_USERNAME: ${{ secrets.MAVENCENTRAL_USERNAME }}
+#          JRELEASER_MAVENCENTRAL_PASSWORD: ${{ secrets.MAVENCENTRAL_PASSWORD }}
+#          JRELEASER_GPG_PASSPHRASE: ${{ secrets.GNUPG_PASSPHRASE }}
+#          JRELEASER_GPG_SECRET_KEY: ${{ secrets.GNUPG_PRIVATE_KEY }}
+#          JRELEASER_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
