@@ -1,6 +1,8 @@
 plugins {
     id("io.micronaut.minimal.library") version "4.6.0"
+    id("org.sonarqube") version "7.0.0.6105"
     `maven-publish`
+    jacoco
 }
 
 version = "1.0.0-SNAPSHOT"
@@ -42,6 +44,23 @@ dependencies {
 tasks {
     test {
         jvmArgs.add("-javaagent:${mockitoAgent.asPath}")
+        finalizedBy(jacocoTestReport)
+    }
+
+    jacocoTestReport {
+        dependsOn(test)
+
+        reports {
+            xml.required.set(true)
+            html.required.set(false)
+        }
+    }
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "FrogDevelopment_micronaut-consul-leadership-election")
+        property("sonar.organization", "frogdevelopment")
     }
 }
 
@@ -50,7 +69,7 @@ testing {
         // Configure the built-in test suite
         val test by getting(JvmTestSuite::class) {
             // Use JUnit Jupiter test framework
-            useJUnitJupiter("5.12.1")
+            useJUnitJupiter(mn.versions.junit5)
         }
     }
 }
