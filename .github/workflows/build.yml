@@ -38,9 +38,6 @@ jobs:
         with:
           files: build/test-results/**/*.xml
 
-      - name: Generate package
-        run: ./gradlew publish
-
 #  publish:
 #    needs: build
 #    runs-on: ubuntu-latest
@@ -48,6 +45,9 @@ jobs:
 #      contents: read
 #
 #    steps:
+#      - name: Generate package
+#        run: ./gradlew publish
+
 #      - name: Deploy released package in MavenCentral
 #        if: startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/tags/')
 #        run: ./gradlew jreleaserDeploy
