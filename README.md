@@ -1,3 +1,8 @@
+![Build](https://github.com/FrogDevelopment/micronaut-consul-leadership-election/actions/workflows/build.yml/badge.svg)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=FrogDevelopment_micronaut-consul-leadership-election&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=FrogDevelopment_micronaut-consul-leadership-election)
+![GitHub Release](https://img.shields.io/github/v/release/FrogDevelopment/micronaut-consul-leadership-election)
+[![Release date](https://img.shields.io/github/release-date/FrogDevelopment/micronaut-consul-leadership-election)](https://packagist.org/packages/FrogDevelopment/micronaut-consul-leadership-election)
+
 # Micronaut Consul Leadership Election
 
 A Micronaut library that provides distributed leadership election capabilities using HashiCorp Consul. This library
