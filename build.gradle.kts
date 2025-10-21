@@ -1,7 +1,5 @@
 plugins {
-    id("io.micronaut.minimal.library") version "4.5.4"
-    id("com.gradleup.shadow") version "8.3.7"
-//    id("io.micronaut.aot") version "4.5.4"
+    id("io.micronaut.minimal.library") version "4.6.0"
     `maven-publish`
 }
 
@@ -74,18 +72,6 @@ micronaut {
         incremental(true)
         annotations("com.frogdevelopment.micronaut.consul.leadership.*")
     }
-//    aot {
-//        // Please review carefully the optimizations enabled below
-//        // Check https://micronaut-projects.github.io/micronaut-aot/latest/guide/ for more details
-//        optimizeServiceLoading = false
-//        convertYamlToJava = false
-//        precomputeOperations = true
-//        cacheEnvironment = true
-//        optimizeClassLoading = true
-//        deduceEnvironment = true
-//        optimizeNetty = true
-//        replaceLogbackXml = true
-//    }
 }
 
 publishing {
