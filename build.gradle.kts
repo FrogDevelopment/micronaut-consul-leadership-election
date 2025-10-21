@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.minimal.library") version "4.6.0"
+    id("org.sonarqube") version "7.0.0.6105"
     `maven-publish`
     jacoco
 }
@@ -53,6 +54,13 @@ tasks {
             xml.required.set(true)
             html.required.set(false)
         }
+    }
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "FrogDevelopment_micronaut-consul-leadership-election")
+        property("sonar.organization", "frogdevelopment")
     }
 }
 
