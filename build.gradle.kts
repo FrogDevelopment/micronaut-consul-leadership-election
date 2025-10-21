@@ -1,6 +1,7 @@
 plugins {
     id("io.micronaut.minimal.library") version "4.6.0"
     `maven-publish`
+    jacoco
 }
 
 version = "1.0.0-SNAPSHOT"
@@ -42,6 +43,16 @@ dependencies {
 tasks {
     test {
         jvmArgs.add("-javaagent:${mockitoAgent.asPath}")
+        finalizedBy(jacocoTestReport)
+    }
+
+    jacocoTestReport {
+        dependsOn(test)
+
+        reports {
+            xml.required.set(true)
+            html.required.set(false)
+        }
     }
 }
 
