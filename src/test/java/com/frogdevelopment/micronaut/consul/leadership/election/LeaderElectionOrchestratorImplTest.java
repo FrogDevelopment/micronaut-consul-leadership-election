@@ -75,6 +75,7 @@ class LeaderElectionOrchestratorImplTest {
 
         // Then
         then(sessionHandler).shouldHaveNoMoreInteractions();
+        assertThat(leaderElectionOrchestrator.getClosing()).isFalse();
     }
 
     @Test
@@ -101,6 +102,7 @@ class LeaderElectionOrchestratorImplTest {
 
         // Then
         then(sessionHandler).shouldHaveNoMoreInteractions();
+        assertThat(leaderElectionOrchestrator.getClosing()).isFalse();
     }
 
     @Test
@@ -130,10 +132,9 @@ class LeaderElectionOrchestratorImplTest {
                 .willReturn(Mono.error(new IllegalStateException("boom")))
                 .willReturn(Mono.empty());
 
-        given(sessionHandler.cancelSessionRenewal()).willReturn(Mono.empty());
-        given(sessionHandler.destroySession()).willReturn(Mono.empty());
         given(configuration.getElection()).willReturn(electionConfiguration);
-        given(electionConfiguration.getTimeoutMs()).willReturn(12);
+        given(electionConfiguration.getMaxRetryAttempts()).willReturn(1);
+        given(electionConfiguration.getRetryDelayMs()).willReturn(5);
 
         // when
         leaderElectionOrchestrator.start();
@@ -151,8 +152,11 @@ class LeaderElectionOrchestratorImplTest {
         given(sessionHandler.createNewSession())
                 .willReturn(Mono.error(new IllegalStateException("boom")));
 
+        given(sessionHandler.cancelSessionRenewal()).willReturn(Mono.empty());
+        given(sessionHandler.destroySession()).willReturn(Mono.empty());
         given(configuration.getElection()).willReturn(electionConfiguration);
-        given(electionConfiguration.getMaxRetryAttempts()).willReturn(1);
+        given(electionConfiguration.getMaxRetryAttempts()).willReturn(0);
+        given(electionConfiguration.getTimeoutMs()).willReturn(12);
 
         // when
         leaderElectionOrchestrator.start();
@@ -161,7 +165,7 @@ class LeaderElectionOrchestratorImplTest {
         // then
         then(leadershipHandler).shouldHaveNoInteractions();
         then(client).shouldHaveNoInteractions();
-        then(sessionHandler).should(times(2)).createNewSession();
+        then(sessionHandler).shouldHaveNoMoreInteractions();
     }
 
     @Test
@@ -211,6 +215,61 @@ class LeaderElectionOrchestratorImplTest {
         given(client.watchLeadership("my-path", 1234)).willReturn(Mono.error(TIMEOUT_EXCEPTION));
         leaderElectionOrchestrator.setModifyIndex(5678);
         given(client.watchLeadership("my-path", 5678)).willReturn(Mono.empty());
+
+        // when
+        leaderElectionOrchestrator.watchForLeadershipInfoChanges(Mono.just(1234));
+        waitForAsyncOperations();
+
+        // then
+        then(client).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
+    void watchForLeadershipInfoChanges_should_immediatelyStop_when_NonRecoverableErrorOccurs() {
+        // given
+        given(configuration.getPath()).willReturn("my-path");
+        given(client.watchLeadership("my-path", 1234)).willReturn(Mono.error(new NonRecoverableElectionException("boom")));
+
+        // when
+        leaderElectionOrchestrator.watchForLeadershipInfoChanges(Mono.just(1234));
+        waitForAsyncOperations();
+
+        // then
+        then(client).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
+    void watchForLeadershipInfoChanges_stopImmediately_when_RecoverableErrorOccursAndMaxRetriesReached() {
+        // given
+        given(configuration.getPath()).willReturn("my-path");
+        given(client.watchLeadership("my-path", 1234)).willReturn(Mono.error(new RuntimeException("boom")));
+        leaderElectionOrchestrator.setModifyIndex(5678);
+
+        given(sessionHandler.cancelSessionRenewal()).willReturn(Mono.empty());
+        given(sessionHandler.destroySession()).willReturn(Mono.empty());
+        given(configuration.getElection()).willReturn(electionConfiguration);
+        given(electionConfiguration.getMaxRetryAttempts()).willReturn(0);
+        given(electionConfiguration.getTimeoutMs()).willReturn(12);
+
+        // when
+        leaderElectionOrchestrator.watchForLeadershipInfoChanges(Mono.just(1234));
+        waitForAsyncOperations();
+
+        // then
+        then(client).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
+    void watchForLeadershipInfoChanges_should_reWatch_when_RecoverableErrorOccursAndMaxRetriesNotReached() {
+        // given
+        given(configuration.getPath()).willReturn("my-path");
+        given(client.watchLeadership("my-path", 1234)).willReturn(Mono.error(new RuntimeException("boom")));
+        leaderElectionOrchestrator.setModifyIndex(5678);
+        given(client.watchLeadership("my-path", 5678)).willReturn(Mono.empty());
+
+        given(configuration.getElection()).willReturn(electionConfiguration);
+        given(electionConfiguration.getMaxRetryAttempts()).willReturn(2);
+        given(electionConfiguration.getRetryDelayMs()).willReturn(5);
 
         // when
         leaderElectionOrchestrator.watchForLeadershipInfoChanges(Mono.just(1234));
@@ -313,6 +372,7 @@ class LeaderElectionOrchestratorImplTest {
         then(disposable).should(times(disposed ? 0 : 1)).dispose();
         assertThat(leaderElectionOrchestrator.getListener()).isNull();
         assertThat(leaderElectionOrchestrator.getModifyIndex()).isNull();
+        assertThat(leaderElectionOrchestrator.getClosing()).isTrue();
     }
 
     @Test
@@ -333,6 +393,7 @@ class LeaderElectionOrchestratorImplTest {
         then(disposable).should().dispose();
         assertThat(leaderElectionOrchestrator.getListener()).isNull();
         assertThat(leaderElectionOrchestrator.getModifyIndex()).isNull();
+        assertThat(leaderElectionOrchestrator.getClosing()).isTrue();
     }
 
     @Test
@@ -354,6 +415,7 @@ class LeaderElectionOrchestratorImplTest {
         then(disposable).should().dispose();
         assertThat(leaderElectionOrchestrator.getListener()).isNull();
         assertThat(leaderElectionOrchestrator.getModifyIndex()).isNull();
+        assertThat(leaderElectionOrchestrator.getClosing()).isTrue();
     }
 
     @Test
@@ -376,10 +438,11 @@ class LeaderElectionOrchestratorImplTest {
         then(disposable).should().dispose();
         assertThat(leaderElectionOrchestrator.getListener()).isNull();
         assertThat(leaderElectionOrchestrator.getModifyIndex()).isNull();
+        assertThat(leaderElectionOrchestrator.getClosing()).isTrue();
     }
 
     private void waitForAsyncOperations() {
-        waitForAsyncOperations(100);
+        waitForAsyncOperations(200);
     }
 
     private void waitForAsyncOperations(final int millis) {
