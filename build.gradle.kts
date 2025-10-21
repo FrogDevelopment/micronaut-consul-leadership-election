@@ -1,6 +1,6 @@
 plugins {
     id("io.micronaut.minimal.library") version "4.5.4"
-    id("com.gradleup.shadow") version "8.3.7"
+    id("com.gradleup.shadow") version "9.2.2"
 //    id("io.micronaut.aot") version "4.5.4"
     `maven-publish`
 }
