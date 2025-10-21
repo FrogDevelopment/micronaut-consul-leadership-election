@@ -161,7 +161,7 @@ class LeaderElectionOrchestratorImplTest {
         // then
         then(leadershipHandler).shouldHaveNoInteractions();
         then(client).shouldHaveNoInteractions();
-        then(sessionHandler).shouldHaveNoMoreInteractions();
+        then(sessionHandler).should(times(2)).createNewSession();
     }
 
     @Test
