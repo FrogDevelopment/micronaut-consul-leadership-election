@@ -61,7 +61,7 @@ testing {
         // Configure the built-in test suite
         val test by getting(JvmTestSuite::class) {
             // Use JUnit Jupiter test framework
-            useJUnitJupiter("5.12.1")
+            useJUnitJupiter(mn.versions.junit5)
         }
     }
 }
