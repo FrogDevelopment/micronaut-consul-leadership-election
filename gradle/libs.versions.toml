@@ -1,4 +1,8 @@
 [versions]
 micronaut = "4.9.3"
+awaitility = "4.3.0"
 
 [libraries]
+awaitility = { group = "org.awaitility", name = "awaitility", version.ref = "awaitility" }
+
+testcontainers-junit-jupiter = { group = "org.testcontainers", name = "junit-jupiter" }
