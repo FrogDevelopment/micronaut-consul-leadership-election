@@ -24,6 +24,41 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Compile
+        run: ./gradlew classes
+
+      - name: Test
+        run: ./gradlew test jacocoTestReport
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: build/test-results/**/*.xml
+
+  sonar:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v5
+        with:
+          # Disabling shallow clone is recommended for improving relevancy of reporting.
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
       - name: Cache SonarQube packages
         uses: actions/cache@v4
         with:
@@ -34,21 +69,19 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Compile
-        run: ./gradlew classes
-
-      - name: Test
-        run: ./gradlew test
-
-      - name: Analyze
-        run: ./gradlew sonar
+      - name: Run Sonar Analyze
+        run: ./gradlew jacocoTestReport sonar
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-      - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
+      - name: SonarQube Quality Gate check
+        id: sonarqube-quality-gate-check
+        uses: sonarsource/sonarqube-quality-gate-action@master
         with:
-          files: build/test-results/**/*.xml
+          pollingTimeoutSec: 600
+          scanMetadataReportFile: build/sonar/report-task.txt
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
 #  publish:
 #    needs: build
