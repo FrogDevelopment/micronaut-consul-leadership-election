@@ -1,12 +1,16 @@
 package com.frogdevelopment.micronaut.consul.leadership.status;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.Optional;
 
 import jakarta.inject.Singleton;
 
 import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetails;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipChangeEvent;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipDetailsChangeEvent;
+import com.frogdevelopment.micronaut.consul.leadership.kubernetes.UpdatePodLabel;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.runtime.event.annotation.EventListener;
@@ -29,7 +33,10 @@ import io.micronaut.runtime.event.annotation.EventListener;
  */
 @Slf4j
 @Singleton
+@RequiredArgsConstructor
 public class LeadershipStatusImpl implements LeadershipStatus {
+
+    private final Optional<UpdatePodLabel> updatePodLabel;
 
     private boolean isLeader;
     private LeadershipDetails leadershipDetails;
@@ -58,6 +65,8 @@ public class LeadershipStatusImpl implements LeadershipStatus {
     public void onLeadershipChanged(@NonNull final LeadershipChangeEvent event) {
         this.isLeader = event.isLeader();
         log.debug("Current leader: {}", isLeader);
+
+        updatePodLabel.ifPresent(podLabel -> podLabel.updatePodLabel(isLeader));
     }
 
     /**

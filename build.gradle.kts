@@ -17,6 +17,10 @@ dependencies {
     annotationProcessor(mn.lombok)
     annotationProcessor(mn.micronaut.serde.processor)
 
+    compileOnly(mn.micronaut.kubernetes.client.openapi)
+    compileOnly(mn.micronaut.kubernetes.client.openapi.common)
+    compileOnly(mn.micronaut.kubernetes.client.openapi.operator)
+
     implementation(mn.micronaut.serde.jackson)
     implementation(mn.micronaut.jackson.databind)
     implementation(mn.micronaut.discovery.client)
@@ -34,6 +38,7 @@ dependencies {
     testImplementation(mn.assertj.core)
     testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.awaitility)
+//    testImplementation(mn.micronaut.kubernetes.openapi)
 
     testRuntimeOnly(mn.micronaut.http.server.netty)
     testRuntimeOnly(mn.micronaut.http.client)

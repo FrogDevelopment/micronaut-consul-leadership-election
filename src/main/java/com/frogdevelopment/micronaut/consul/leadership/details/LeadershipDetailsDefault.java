@@ -37,6 +37,8 @@ public class LeadershipDetailsDefault implements LeadershipDetails {
     @Nullable
     String hostname;
 
+    String namespace;
+
     /**
      * The cluster name the leader instance belongs to.
      */

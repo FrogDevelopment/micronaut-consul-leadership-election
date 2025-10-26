@@ -11,7 +11,9 @@ import jakarta.inject.Singleton;
 import com.frogdevelopment.micronaut.consul.leadership.exceptions.NonRecoverableElectionException;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.Environment;
+import io.micronaut.kubernetes.client.openapi.config.KubeConfig;
+import io.micronaut.kubernetes.client.openapi.resolver.NamespaceResolver;
+import io.micronaut.kubernetes.client.openapi.resolver.PodNameResolver;
 import io.micronaut.serde.ObjectMapper;
 
 /**
@@ -45,7 +47,9 @@ final class LeadershipDetailsProviderDefaultImpl implements LeadershipDetailsPro
 
     static final String DEFAULT_VALUE = "n/a";
 
-    private final Environment environment;
+    private final PodNameResolver podNameResolver;
+    private final NamespaceResolver namespaceResolver;
+    private final KubeConfig kubeConfig;
     private final ObjectMapper objectMapper;
 
     /**
@@ -68,8 +72,9 @@ final class LeadershipDetailsProviderDefaultImpl implements LeadershipDetailsPro
     @Override
     public LeadershipDetails getLeadershipInfo(final boolean isAcquire) {
         final var builder = LeadershipDetailsDefault.builder()
-                .hostname(environment.get("hostname", String.class, DEFAULT_VALUE))
-                .clusterName(environment.get("cluster_name", String.class, DEFAULT_VALUE));
+                .hostname(podNameResolver.getPodName().orElseThrow())
+                .namespace(namespaceResolver.resolveNamespace())
+                .clusterName(kubeConfig.getCluster().server());
         if (isAcquire) {
             builder.acquireDateTime(LocalDateTime.now().toString());
         } else {
