@@ -61,6 +61,7 @@ sonar {
     properties {
         property("sonar.projectKey", "FrogDevelopment_micronaut-consul-leadership-election")
         property("sonar.organization", "frogdevelopment")
+        property("sonar.junit.reportPaths", "build/test-results/test/")
     }
 }
 
