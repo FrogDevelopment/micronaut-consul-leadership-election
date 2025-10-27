@@ -11,7 +11,7 @@ This library enables multiple instances of an application deployed among multipl
 single leader, ensuring that only one instance
 performs critical operations at any given time.
 
-> :info: If you need Leader Election in a **single cluster**, you may instead directly
+> :warning: If you need Leader Election in a **single cluster**, you may instead directly
 > use [Micronaut Kubernetes](https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/) Leader Election
 > feature.
 
