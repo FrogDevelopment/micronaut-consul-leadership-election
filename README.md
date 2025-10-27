@@ -5,9 +5,15 @@
 
 # Micronaut Consul Leadership Election
 
-A Micronaut library that provides distributed leadership election capabilities using HashiCorp Consul. This library
-enables multiple instances of an application to coordinate and elect a single leader, ensuring that only one instance
+A Micronaut library that provides distributed leadership election capabilities **across multiple clusters** using
+HashiCorp Consul.
+This library enables multiple instances of an application deployed among multiple clusters to coordinate and elect a
+single leader, ensuring that only one instance
 performs critical operations at any given time.
+
+> :warning: If you need Leader Election in a **single cluster**, you may instead directly
+> use [Micronaut Kubernetes](https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/) Leader Election
+> feature.
 
 ## Features
 
