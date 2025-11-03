@@ -5,15 +5,15 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 import jakarta.inject.Singleton;
 
 import com.frogdevelopment.micronaut.consul.leadership.exceptions.NonRecoverableElectionException;
+import com.frogdevelopment.micronaut.consul.leadership.kubernetes.KubernetesInfoResolver;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.kubernetes.client.openapi.config.KubeConfig;
-import io.micronaut.kubernetes.client.openapi.resolver.NamespaceResolver;
-import io.micronaut.kubernetes.client.openapi.resolver.PodNameResolver;
+import io.micronaut.context.env.Environment;
 import io.micronaut.serde.ObjectMapper;
 
 /**
@@ -45,11 +45,8 @@ import io.micronaut.serde.ObjectMapper;
 @Requires(missingBeans = LeadershipDetailsProvider.class)
 final class LeadershipDetailsProviderDefaultImpl implements LeadershipDetailsProvider {
 
-    static final String DEFAULT_VALUE = "n/a";
-
-    private final PodNameResolver podNameResolver;
-    private final NamespaceResolver namespaceResolver;
-    private final KubeConfig kubeConfig;
+    private final Optional<KubernetesInfoResolver> kubernetesInfoResolver;
+    private final Environment environment;
     private final ObjectMapper objectMapper;
 
     /**
@@ -65,16 +62,17 @@ final class LeadershipDetailsProviderDefaultImpl implements LeadershipDetailsPro
      * This allows tracking of leadership transitions in the stored leadership information.
      * </p>
      *
-     * @param isAcquire {@code true} if this is for acquiring leadership (sets acquire timestamp),
-     *                  {@code false} if this is for releasing leadership (sets release timestamp)
      * @return a {@link LeadershipDetails} object containing hostname, cluster name, and appropriate timestamp
      */
     @Override
     public LeadershipDetails getLeadershipInfo(final boolean isAcquire) {
         final var builder = LeadershipDetailsDefault.builder()
-                .hostname(podNameResolver.getPodName().orElseThrow())
-                .namespace(namespaceResolver.resolveNamespace())
-                .clusterName(kubeConfig.getCluster().server());
+                .podName(kubernetesInfoResolver.flatMap(KubernetesInfoResolver::resolvePodName)
+                        .or(() -> environment.getProperty("hostname", String.class))
+                        .or(() -> environment.getProperty("micronaut.application.name", String.class))
+                        .orElseThrow(() -> new IllegalStateException("Neither Pod Name hostname nor application name was resolvable!")))
+                .namespace(kubernetesInfoResolver.flatMap(KubernetesInfoResolver::resolveNamespace).orElse("n/a"))
+                .clusterName(kubernetesInfoResolver.flatMap(KubernetesInfoResolver::resolveClusterName).orElse("n/a"));
         if (isAcquire) {
             builder.acquireDateTime(LocalDateTime.now().toString());
         } else {

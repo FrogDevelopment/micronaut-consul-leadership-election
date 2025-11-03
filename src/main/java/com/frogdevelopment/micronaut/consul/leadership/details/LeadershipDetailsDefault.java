@@ -12,16 +12,8 @@ import io.micronaut.serde.annotation.Serdeable;
  * <p>
  * This class holds information about the current or past leader in a distributed
  * leadership election scenario. It includes identification details (hostname, cluster name)
- * and temporal information (when leadership was acquired or released).
+ * and temporal information (when leadership was acquired).
  * </p>
- * <p>
- * All fields are nullable to accommodate different use cases:
- * </p>
- * <ul>
- *   <li>When acquiring leadership, only acquireDateTime is typically set</li>
- *   <li>When releasing leadership, only releaseDateTime is typically set</li>
- *   <li>When reading current leader info, all fields may be populated</li>
- * </ul>
  *
  * @since 1.0.0
  */
@@ -32,17 +24,18 @@ import io.micronaut.serde.annotation.Serdeable;
 public class LeadershipDetailsDefault implements LeadershipDetails {
 
     /**
-     * The hostname of the instance holding or having held leadership.
+     * The pod name of the instance holding or having held leadership.
      */
-    @Nullable
-    String hostname;
+    String podName;
 
+    /**
+     * The namespace where the leader instance is deployed.
+     */
     String namespace;
 
     /**
      * The cluster name the leader instance belongs to.
      */
-    @Nullable
     String clusterName;
 
     /**

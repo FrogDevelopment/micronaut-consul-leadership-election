@@ -10,7 +10,7 @@ import io.micronaut.context.event.StartupEvent;
 import io.micronaut.runtime.event.annotation.EventListener;
 
 /**
- * Start and stop Consul {@link LeaderElectionOrchestrator} on {@link StartupEvent} & {@link ShutdownEvent}.
+ * Start and stop Consul {@link LeaderElectionOrchestrator} on {@link StartupEvent} and {@link ShutdownEvent}.
  *
  * @since 1.0.0
  */

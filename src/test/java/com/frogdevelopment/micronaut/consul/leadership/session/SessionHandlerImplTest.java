@@ -158,7 +158,7 @@ class SessionHandlerImplTest {
         given(client.renewSession("my-session-id")).willReturn(Mono.error(new RuntimeException("boom")));
 
         // when
-        sessionHandler.renewSession();
+        sessionHandler.manageSessionRenewal();
 
         // then
         then(client).shouldHaveNoMoreInteractions();
@@ -175,7 +175,7 @@ class SessionHandlerImplTest {
         given(client.renewSession("my-session-id")).willReturn(Mono.empty());
 
         // when
-        sessionHandler.renewSession();
+        sessionHandler.manageSessionRenewal();
 
         // then
         then(client).shouldHaveNoMoreInteractions();
@@ -185,12 +185,12 @@ class SessionHandlerImplTest {
     @Test
     void cancelSessionRenewal_should_cancelScheduledFuture() {
         // given
-        sessionHandler.setSessionId("my-session-id");
+        sessionHandler.setSessionId(null);
         sessionHandler.setScheduledFuture(scheduledFuture);
         given(scheduledFuture.cancel(true)).willReturn(true);
 
         // when
-        sessionHandler.cancelSessionRenewal().block();
+        sessionHandler.manageSessionRenewal();
 
         //
         then(scheduledFuture).shouldHaveNoMoreInteractions();
@@ -200,12 +200,12 @@ class SessionHandlerImplTest {
     @Test
     void cancelSessionRenewal_should_logWarning_when_cancellationFails() {
         // given
-        sessionHandler.setSessionId("my-session-id");
+        sessionHandler.setSessionId(null);
         sessionHandler.setScheduledFuture(scheduledFuture);
         given(scheduledFuture.cancel(true)).willReturn(false);
 
         // when
-        sessionHandler.cancelSessionRenewal().block();
+        sessionHandler.manageSessionRenewal();
 
         //
         then(scheduledFuture).shouldHaveNoMoreInteractions();

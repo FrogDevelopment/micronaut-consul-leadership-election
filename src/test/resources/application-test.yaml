@@ -6,3 +6,8 @@
 #        - consul.client.host
 #      exposed-ports:
 #        - consul.client.port: 8500
+
+consul:
+  client:
+    registration:
+      enabled: false

@@ -81,14 +81,22 @@ public class SessionHandlerImpl implements SessionHandler {
         return Mono.fromRunnable(() -> {
             val sessionRenewalDelay = configuration.getElection().getSessionRenewalDelay();
             log.debug("Scheduling session renewal with fixed delay={}", sessionRenewalDelay);
-            val scheduledFuture = taskScheduler.scheduleWithFixedDelay(ZERO, sessionRenewalDelay, this::renewSession);
+            val scheduledFuture = taskScheduler.scheduleWithFixedDelay(ZERO, sessionRenewalDelay, this::manageSessionRenewal);
             scheduleRef.set(scheduledFuture);
         });
     }
 
     // @VisibleForTesting
-    void renewSession() {
+    void manageSessionRenewal() {
         final var sessionId = sessionIdRef.get();
+        if (sessionId != null) {
+            renewSession(sessionId);
+        } else {
+            doCancelSessionRenewal();
+        }
+    }
+
+    private void renewSession(final String sessionId) {
         log.debug("Renewing session {}", sessionId);
         client.renewSession(sessionId)
                 .onErrorResume(throwable -> {
@@ -102,15 +110,15 @@ public class SessionHandlerImpl implements SessionHandler {
 
     @Override
     public Mono<String> cancelSessionRenewal() {
-        return Mono.justOrEmpty(scheduleRef.getAndSet(null))
-                .doOnNext(schedule -> {
-                    log.debug("Cancelling session renewal");
-                    final boolean cancelled = schedule.cancel(true);
-                    if (!cancelled) {
-                        log.warn("Failed to cancel session renewal task");
-                    }
-                })
+        return Mono.fromRunnable(this::doCancelSessionRenewal)
                 .thenReturn(sessionIdRef.get());
     }
 
+    private void doCancelSessionRenewal() {
+        log.debug("No more session, cancelling renewal");
+        final boolean cancelled = scheduleRef.getAndSet(null).cancel(true);
+        if (!cancelled) {
+            log.warn("Failed to cancel session renewal task");
+        }
+    }
 }

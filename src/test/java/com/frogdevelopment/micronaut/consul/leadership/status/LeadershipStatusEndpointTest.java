@@ -25,7 +25,7 @@ class LeadershipStatusEndpointTest {
         // given
         given(leadershipStatus.isLeader()).willReturn(true);
         final var leadershipInfo = LeadershipDetailsDefault.builder()
-                .hostname("hostname")
+                .podName("hostname")
                 .clusterName("cluster")
                 .acquireDateTime("my-date")
                 .build();

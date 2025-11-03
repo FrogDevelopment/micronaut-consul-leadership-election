@@ -1,4 +1,4 @@
-package com.frogdevelopment.micronaut.consul.leadership.election;
+package com.frogdevelopment.micronaut.consul.leadership;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -36,6 +36,10 @@ class FullTest {
     private EmbeddedServer server2;
     private EmbeddedServer server3;
 
+    private static EmbeddedServer createServer(final HashMap<String, Object> properties) {
+        return ApplicationContext.run(EmbeddedServer.class, properties);
+    }
+
     @BeforeAll
     static void setup() {
         CONSUL.start();
@@ -66,9 +70,12 @@ class FullTest {
         properties.put("micronaut.application.name", "my-application");
         properties.put("consul.client.host", CONSUL.getHost());
         properties.put("consul.client.port", String.valueOf(CONSUL.getMappedPort(8500)));
+        properties.put("consul.leadership.pod-label.enabled", "true");
+        properties.put("mock.namespace", "full-test");
+        properties.put("mock.cluster", "oz");
 
         properties.put("hostname", "server_1");
-        server1 = ApplicationContext.run(EmbeddedServer.class, properties);
+        server1 = createServer(properties);
         assertThat(server1).isNotNull();
         final var leadershipStatus1 = server1.getApplicationContext().getBean(LeadershipStatus.class);
         assertThat(leadershipStatus1).isNotNull();
@@ -76,7 +83,7 @@ class FullTest {
         await().until(leadershipStatus1::isLeader);
 
         properties.put("hostname", "server_2");
-        server2 = ApplicationContext.run(EmbeddedServer.class, properties);
+        server2 = createServer(properties);
         assertThat(server2).isNotNull();
         final var leadershipStatus2 = server2.getApplicationContext().getBean(LeadershipStatus.class);
         assertThat(leadershipStatus2).isNotNull();
@@ -84,7 +91,7 @@ class FullTest {
         assertThat(leadershipStatus2.isLeader()).isFalse();
 
         properties.put("hostname", "server_3");
-        server3 = ApplicationContext.run(EmbeddedServer.class, properties);
+        server3 = createServer(properties);
         assertThat(server3).isNotNull();
         final var leadershipStatus3 = server3.getApplicationContext().getBean(LeadershipStatus.class);
         assertThat(leadershipStatus3).isNotNull();

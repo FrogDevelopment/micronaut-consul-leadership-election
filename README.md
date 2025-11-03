@@ -28,13 +28,13 @@ performs critical operations at any given time.
 - **Event-Driven Architecture**: Publish leadership change events for reactive application behavior
 - **Comprehensive Documentation**: Fully documented API with detailed JavaDoc for all public classes and methods
 - **Graceful Shutdown**: Properly releases leadership and cleans up resources during application shutdown
+- **Pod label update**: Pod label updated according to current leadership status, toggleable and configurable
 
 ## Requirements
 
 - Java 21 or higher
-- Micronaut Framework 4.x
-- HashiCorp Consul server
-- Reactive Streams support (Project Reactor)
+- [Micronaut Framework](https://micronaut.io/) 4.x
+- [HashiCorp Consul](https://developer.hashicorp.com/consul) server
 
 ## Installation
 
@@ -43,7 +43,7 @@ Add the dependency to your `build.gradle` (Gradle) or `pom.xml` (Maven):
 ### Gradle
 
 ```kotlin
-implementation("frog.development.micronaut.consul:leadership-election:1.0.0-SNAPSHOT")
+implementation("com.frogdevelopment.micronaut.consul:leadership-election:1.0.0-SNAPSHOT")
 ```
 
 ### Maven
@@ -51,7 +51,7 @@ implementation("frog.development.micronaut.consul:leadership-election:1.0.0-SNAP
 ```xml
 
 <dependency>
-    <groupId>frog.development.micronaut.consul</groupId>
+    <groupId>com.frogdevelopment.micronaut.consul</groupId>
     <artifactId>leadership-election</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
@@ -70,6 +70,25 @@ implementation("frog.development.micronaut.consul:leadership-election:1.0.0-SNAP
 | `consul.leadership.election.max-retry-attempts`    | Integer  | `3`                                        | Maximum number of retry attempts for operations                             |
 | `consul.leadership.election.retry-delay-ms`        | Integer  | `500`                                      | Delay between retry attempts in milliseconds                                |
 | `consul.leadership.election.timeout-ms`            | Integer  | `3000`                                     | Timeout for Consul operations in milliseconds                               |
+| `consul.leadership.pod-label.enabled`              | Boolean  | `true`                                     | Enable/disable pod label update with leadership status                      |
+| `consul.leadership.pod-label.key`                  | String   | `leadership-status`                        | Customize pod label key                                                     |
+| `consul.leadership.pod-label.label-for-leader`     | String   | `leader`                                   | Customize pod label value in case of leader                                 |
+| `consul.leadership.pod-label.label-for-follower`   | String   | `follower`                                 | Customize pod label value in case of not leader                             |
+
+### Kubernetes RBAC for Pod Label Updates
+
+When pod label updates are enabled, the service account needs permissions to patch pods:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: leadership-pod-updater
+rules:
+  - apiGroups: [ "" ]
+    resources: [ "pods" ]
+    verbs: [ "patch" ]
+```
 
 ## Usage
 
@@ -137,7 +156,7 @@ import io.micronaut.runtime.event.annotation.EventListener;
 @EventListener
 public void onLeadershipInfoDetailsChange(final LeadershipDetailsChangeEvent event) {
     final LeadershipDetails details = event.leadershipDetails();
-    // Access leader details like hostname, cluster name, timestamps, etc.
+    // Access leader details like pod name, namespace,  cluster name, timestamps, etc.
 }
 ```
 
@@ -155,10 +174,10 @@ Response example:
 {
   "isLeader": true,
   "details": {
-    "hostname": "app-instance-1",
+    "podName": "app-instance-1",
+    "namespace": "production-environment",
     "clusterName": "production-cluster",
-    "acquireDateTime": "2025-10-18T22:45:30",
-    "releaseDateTime": null
+    "acquireDateTime": "2025-10-18T22:45:30"
   }
 }
 ```
@@ -169,31 +188,6 @@ This endpoint is useful for:
 - Load balancer routing decisions
 - Operational dashboards
 - External system integration
-
-### Custom Session Provider
-
-You can provide your own session configuration by implementing the `SessionProvider` interface:
-
-```java
-import com.frogdevelopment.micronaut.consul.leadership.election.SessionProvider;
-import com.frogdevelopment.micronaut.consul.leadership.client.Session;
-
-import jakarta.inject.Singleton;
-
-@Singleton
-public class CustomSessionProvider implements SessionProvider {
-
-    @Override
-    public Session createSession() {
-        return Session.builder()
-                .name("custom-session-name")
-                .behavior(Session.Behavior.RELEASE)
-                .lockDelay("10s")
-                .ttl("30s")
-                .build();
-    }
-}
-```
 
 ### Custom Leadership Details Provider
 
@@ -212,7 +206,6 @@ public class CustomLeadershipDetailsProvider implements LeadershipDetailsProvide
     public LeadershipDetails getLeadershipInfo(final boolean isAcquire) {
         return MyLeadershipDetails.builder()
                 .hostname("my-custom-hostname")
-                .clusterName("production-cluster")
                 .provider("GCP")
                 .build();
     }
