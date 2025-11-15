@@ -38,8 +38,8 @@ public class LeadershipStatusImpl implements LeadershipStatus {
 
     private final Optional<UpdatePodLabel> updatePodLabel;
 
-    private boolean isLeader;
-    private LeadershipDetails leadershipDetails;
+    private volatile boolean isLeader;
+    private volatile LeadershipDetails leadershipDetails;
 
     @Override
     public boolean isLeader() {
