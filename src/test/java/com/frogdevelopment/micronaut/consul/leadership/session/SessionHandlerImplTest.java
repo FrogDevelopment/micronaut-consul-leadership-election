@@ -163,7 +163,6 @@ class SessionHandlerImplTest {
         // then
         then(client).shouldHaveNoMoreInteractions();
         assertThat(sessionHandler.getSessionId()).isEqualTo("my-session-id");
-        // todo check logs
     }
 
     @Test
@@ -210,6 +209,5 @@ class SessionHandlerImplTest {
         //
         then(scheduledFuture).shouldHaveNoMoreInteractions();
         assertThat(sessionHandler.getScheduledFuture()).isNull();
-        // todo check logs
     }
 }

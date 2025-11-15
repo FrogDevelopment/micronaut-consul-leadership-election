@@ -92,7 +92,7 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
     }
 
     private Mono<Integer> handleIsLeader() {
-        log.info("Leadership acquired successfully \uD83C\uDF89 \uD83D\uDC51 \uD83C\uDF89");
+        log.info("Leadership acquired successfully");
         // when leader, periodically renew the session to avoid expiration
         return sessionHandler.scheduleSessionRenewal()
                 // when acquiring leadership, we updated the KV => index has changed
@@ -105,7 +105,7 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
     }
 
     private Mono<Integer> handleIsNotLeader() {
-        log.info("Leadership acquisition failed, another leader exists \uD83D\uDE29 \uD83D\uDE2D");
+        log.info("Leadership acquisition failed, another leader exists");
         return sessionHandler.destroySession()
                 .then(Mono.defer(() -> Optional.ofNullable(modifyIndexRef.get())
                         .map(Mono::just)

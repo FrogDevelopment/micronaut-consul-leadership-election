@@ -19,7 +19,7 @@ import io.micronaut.context.env.Environment;
  * This implementation creates sessions with the following characteristics:
  * </p>
  * <ul>
- *   <li>Session name - FIXME</li>
+ *   <li>Session name - derived from Kubernetes pod name, hostname, or application name (in that order of preference)</li>
  *   <li>Session behavior - set to RELEASE, meaning locks are released when the session expires</li>
  *   <li>Lock delay - configured from leadership election settings to prevent rapid lock re-acquisition</li>
  *   <li>TTL (Time To Live) - configured from leadership election settings for session expiration</li>

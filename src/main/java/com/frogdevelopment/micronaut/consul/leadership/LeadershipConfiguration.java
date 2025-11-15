@@ -3,7 +3,9 @@ package com.frogdevelopment.micronaut.consul.leadership;
 import java.time.Duration;
 import java.util.Optional;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Context;
@@ -34,14 +36,27 @@ public interface LeadershipConfiguration {
     String PREFIX = "consul.leadership";
 
     /**
-     * Gets the Consul authentication token.
+     * Gets the Consul authentication token for ACL authentication.
      * <p>
      * This token is used to authenticate with the Consul server when performing
-     * leadership election operations. If not provided, the client will attempt
-     * to connect without authentication.
+     * leadership election operations. The token is <strong>optional</strong> and only
+     * required when Consul's Access Control List (ACL) system is enabled.
+     * </p>
+     * <p>
+     * <strong>When to provide a token:</strong>
+     * </p>
+     * <ul>
+     *   <li><strong>ACLs enabled:</strong> A valid token with appropriate permissions
+     *       (session:write, kv:write, kv:read) is required</li>
+     *   <li><strong>ACLs disabled:</strong> Token is not needed; requests will be
+     *       sent without authentication</li>
+     * </ul>
+     * <p>
+     * <strong>Security best practice:</strong> Store tokens in environment variables
+     * or secure configuration management systems rather than plain text configuration files.
      * </p>
      *
-     * @return the Consul authentication token, or empty if not configured
+     * @return the Consul authentication token, or {@code Optional.empty()} if not configured
      */
     Optional<String> getToken();
 
@@ -125,8 +140,9 @@ public interface LeadershipConfiguration {
          * temporary Consul unavailability.
          * </p>
          *
-         * @return the maximum number of retry attempts
+         * @return the maximum number of retry attempts (must be at least 1)
          */
+        @Min(1)
         @Bindable(defaultValue = "3")
         Integer getMaxRetryAttempts();
 
@@ -138,8 +154,9 @@ public interface LeadershipConfiguration {
          * overwhelming the Consul server with rapid retry attempts.
          * </p>
          *
-         * @return the retry delay in milliseconds
+         * @return the retry delay in milliseconds (must be positive)
          */
+        @Positive
         @Bindable(defaultValue = "500")
         Integer getRetryDelayMs();
 
@@ -151,8 +168,9 @@ public interface LeadershipConfiguration {
          * from hanging indefinitely.
          * </p>
          *
-         * @return the operation timeout in milliseconds
+         * @return the operation timeout in milliseconds (must be positive)
          */
+        @Positive
         @Bindable(defaultValue = "3000")
         Integer getTimeoutMs();
     }
