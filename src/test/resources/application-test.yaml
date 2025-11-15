@@ -1,12 +1,3 @@
-#test-resources:
-#  containers:
-#    consul:
-#      image-name: hashicorp/consul:1.21.5
-#      hostnames:
-#        - consul.client.host
-#      exposed-ports:
-#        - consul.client.port: 8500
-
 consul:
   client:
     registration:
