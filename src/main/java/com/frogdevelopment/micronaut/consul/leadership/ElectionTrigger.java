@@ -2,9 +2,10 @@ package com.frogdevelopment.micronaut.consul.leadership;
 
 import lombok.extern.slf4j.Slf4j;
 
+import jakarta.inject.Singleton;
+
 import com.frogdevelopment.micronaut.consul.leadership.election.LeaderElectionOrchestrator;
 
-import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.event.ShutdownEvent;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.runtime.event.annotation.EventListener;
@@ -15,7 +16,7 @@ import io.micronaut.runtime.event.annotation.EventListener;
  * @since 1.0.0
  */
 @Slf4j
-@Prototype
+@Singleton
 public final class ElectionTrigger {
 
     /**
