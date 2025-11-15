@@ -116,9 +116,12 @@ public class SessionHandlerImpl implements SessionHandler {
 
     private void doCancelSessionRenewal() {
         log.debug("No more session, cancelling renewal");
-        final boolean cancelled = scheduleRef.getAndSet(null).cancel(true);
-        if (!cancelled) {
-            log.warn("Failed to cancel session renewal task");
+        final ScheduledFuture<?> future = scheduleRef.getAndSet(null);
+        if (future != null) {
+            final boolean cancelled = future.cancel(true);
+            if (!cancelled) {
+                log.warn("Failed to cancel session renewal task");
+            }
         }
     }
 }
