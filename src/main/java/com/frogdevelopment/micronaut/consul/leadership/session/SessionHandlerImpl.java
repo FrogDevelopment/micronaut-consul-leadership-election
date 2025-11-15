@@ -111,7 +111,7 @@ public class SessionHandlerImpl implements SessionHandler {
     @Override
     public Mono<String> cancelSessionRenewal() {
         return Mono.fromRunnable(this::doCancelSessionRenewal)
-                .thenReturn(sessionIdRef.get());
+                .then(Mono.justOrEmpty(sessionIdRef.get()));
     }
 
     // @VisibleForTesting
