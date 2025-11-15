@@ -75,20 +75,9 @@ implementation("com.frogdevelopment.micronaut.consul:leadership-election:1.0.0-S
 | `consul.leadership.pod-label.label-for-leader`     | String   | `leader`                                   | Customize pod label value in case of leader                                 |
 | `consul.leadership.pod-label.label-for-follower`   | String   | `follower`                                 | Customize pod label value in case of not leader                             |
 
-### Kubernetes RBAC for Pod Label Updates
-
-When pod label updates are enabled, the service account needs permissions to patch pods:
-
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: leadership-pod-updater
-rules:
-  - apiGroups: [ "" ]
-    resources: [ "pods" ]
-    verbs: [ "patch" ]
-```
+> **Note:** When pod label updates are enabled (`consul.leadership.pod-label.enabled=true`), the service account
+> requires Kubernetes RBAC permissions to patch pods. See [Security Considerations](#security-considerations) for required
+> RBAC configuration and how to disable this feature if needed.
 
 ## Usage
 
@@ -266,6 +255,67 @@ flowchart TB
     cancelSessionRenewal --> releaseLeadership[Release Leadership]
     releaseLeadership --> destroySession[Destroy Session]
     destroySession --> x
+```
+
+## Security Considerations
+
+### Consul ACL Token Security
+
+The library requires a Consul ACL token with appropriate permissions to manage sessions and key-value operations. *
+*Never store tokens in configuration files committed to version control.**
+
+#### Recommended Approach: Environment Variables
+
+```yaml
+consul:
+  leadership:
+    token: ${CONSUL_TOKEN}
+```
+
+#### Required Consul ACL Permissions
+
+The token must have the following permissions:
+
+```hcl
+# Session management
+session "write" {
+  policy = "write"
+}
+
+# KV store for leadership coordination
+key_prefix "leadership/" {
+  policy = "write"
+}
+```
+
+For more restrictive policies, limit the KV prefix to match your configured path (e.g., `leadership/your-app-name/`).
+
+### Kubernetes RBAC for Pod Label Updates
+
+When the pod label update feature is enabled (`consul.leadership.pod-label.enabled=true`), the service account requires
+specific RBAC permissions.
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: leadership-pod-updater
+  namespace: your-namespace
+rules:
+  - apiGroups: [ "" ]
+    resources: [ "pods" ]
+    verbs: [ "patch" ]
+```
+
+#### Disabling Pod Label Updates
+
+If Kubernetes integration is not needed or RBAC permissions cannot be granted:
+
+```yaml
+consul:
+  leadership:
+    pod-label:
+      enabled: false
 ```
 
 ## Best Practices
