@@ -1,6 +1,7 @@
 package com.frogdevelopment.micronaut.consul.leadership.event;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
 import java.util.Base64;
@@ -28,6 +29,7 @@ import io.micronaut.context.event.ApplicationEventPublisher;
  *
  * @since 1.0.0
  */
+@Slf4j
 @Prototype
 @RequiredArgsConstructor
 public final class LeadershipEventsPublisher {
@@ -65,8 +67,19 @@ public final class LeadershipEventsPublisher {
      * @param encodedValue the base64-encoded leadership information from Consul
      */
     public void publishLeadershipDetailsChange(final String encodedValue) {
-        val decodedValue = new String(base64Decoder.decode(encodedValue));
-        val leadershipInfo = leadershipDetailsProvider.convertValue(decodedValue);
-        leadershipDetailsChangeEventPublisher.publishEvent(new LeadershipDetailsChangeEvent(leadershipInfo));
+        if (encodedValue == null || encodedValue.isBlank()) {
+            log.warn("Received null or empty encoded value, skipping event publishing");
+            return;
+        }
+
+        try {
+            val decodedValue = new String(base64Decoder.decode(encodedValue));
+            val leadershipInfo = leadershipDetailsProvider.convertValue(decodedValue);
+            leadershipDetailsChangeEventPublisher.publishEvent(new LeadershipDetailsChangeEvent(leadershipInfo));
+        } catch (final IllegalArgumentException e) {
+            log.error("Failed to decode base64 value: {}", encodedValue, e);
+        } catch (final Exception e) {
+            log.error("Failed to process leadership details change", e);
+        }
     }
 }

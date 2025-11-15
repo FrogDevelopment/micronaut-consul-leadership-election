@@ -1,8 +1,10 @@
 package com.frogdevelopment.micronaut.consul.leadership.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -75,6 +77,56 @@ class LeadershipEventsPublisherTest {
         then(leadershipDetailsChangeEventPublisher).should().publishEvent(leadershipDetailsChangeEventCaptor.capture());
         final var changeEvent = leadershipDetailsChangeEventCaptor.getValue();
         assertThat(changeEvent.leadershipDetails()).isEqualTo(leadershipDetails);
+    }
+
+    @Test
+    void should_notPublishEvent_whenEncodedValueIsNull() {
+        // given
+        final String encodedValue = null;
+
+        // when
+        leadershipEventsPublisher.publishLeadershipDetailsChange(encodedValue);
+
+        // then
+        then(leadershipDetailsChangeEventPublisher).should(never()).publishEvent(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   ", "\t", "\n"})
+    void should_notPublishEvent_whenEncodedValueIsBlank(final String encodedValue) {
+        // given
+
+        // when
+        leadershipEventsPublisher.publishLeadershipDetailsChange(encodedValue);
+
+        // then
+        then(leadershipDetailsChangeEventPublisher).should(never()).publishEvent(any());
+    }
+
+    @Test
+    void should_notPublishEvent_whenBase64DecodingFails() {
+        // given
+        final var invalidBase64 = "not-valid-base64!@#$";
+
+        // when
+        leadershipEventsPublisher.publishLeadershipDetailsChange(invalidBase64);
+
+        // then
+        then(leadershipDetailsChangeEventPublisher).should(never()).publishEvent(any());
+    }
+
+    @Test
+    void should_notPublishEvent_whenConvertValueThrowsException() {
+        // given
+        final var value = "test";
+        final var encodedValue = Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+        given(leadershipDetailsProvider.convertValue(value)).willThrow(new RuntimeException("Conversion failed"));
+
+        // when
+        leadershipEventsPublisher.publishLeadershipDetailsChange(encodedValue);
+
+        // then
+        then(leadershipDetailsChangeEventPublisher).should(never()).publishEvent(any());
     }
 
 }
