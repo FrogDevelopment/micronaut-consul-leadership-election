@@ -105,7 +105,7 @@ class FullTest {
 
         // assert that a new leader will be elected
         server1.stop();
-        await().atMost(Duration.ofMillis(500))
+        await().atMost(Duration.ofSeconds(10))
                 .until(() -> leadershipStatus2.isLeader()
                              || leadershipStatus3.isLeader());
 

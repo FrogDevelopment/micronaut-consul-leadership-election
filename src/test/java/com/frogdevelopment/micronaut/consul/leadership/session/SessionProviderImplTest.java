@@ -55,6 +55,7 @@ class SessionProviderImplTest {
         // given
         final var sessionProvider = new SessionProviderImpl(Optional.empty(), environment, configuration);
 
+        given(environment.getProperty("hostname", String.class)).willReturn(Optional.empty());
         given(environment.getProperty("micronaut.application.name", String.class)).willReturn(Optional.of("my-podname"));
         given(configuration.getElection()).willReturn(electionConfiguration);
         given(electionConfiguration.getSessionLockDelay()).willReturn("3s");

@@ -55,10 +55,11 @@ class LeadershipDetailsProviderDefaultImplTest {
     void should_getLeadershipInfoFromFallback() {
         // given
         final var defaultLeadershipInfoProvider = new LeadershipDetailsProviderDefaultImpl(Optional.empty(), environment, objectMapper);
+        given(environment.getProperty("hostname", String.class)).willReturn(Optional.empty());
         given(environment.getProperty("micronaut.application.name", String.class)).willReturn(Optional.of("my-podname"));
 
         // when
-        final var leadershipInfo = defaultLeadershipInfoProvider.getLeadershipInfo(false);
+        final var leadershipInfo = defaultLeadershipInfoProvider.getLeadershipInfo(true);
 
         // then
         assertThat(leadershipInfo).isInstanceOfSatisfying(LeadershipDetailsDefault.class, defaultLeadershipInfo -> {

@@ -182,7 +182,7 @@ class SessionHandlerImplTest {
     }
 
     @Test
-    void cancelSessionRenewal_should_cancelScheduledFuture() {
+    void manageSessionRenewal_should_cancelScheduledFuture() {
         // given
         sessionHandler.setSessionId(null);
         sessionHandler.setScheduledFuture(scheduledFuture);
@@ -197,7 +197,7 @@ class SessionHandlerImplTest {
     }
 
     @Test
-    void cancelSessionRenewal_should_logWarning_when_cancellationFails() {
+    void manageSessionRenewal_should_logWarning_when_cancellationFails() {
         // given
         sessionHandler.setSessionId(null);
         sessionHandler.setScheduledFuture(scheduledFuture);
@@ -209,5 +209,31 @@ class SessionHandlerImplTest {
         //
         then(scheduledFuture).shouldHaveNoMoreInteractions();
         assertThat(sessionHandler.getScheduledFuture()).isNull();
+    }
+
+    @Test
+    void doCancelSessionRenewal_should_handleNullScheduleFuture() {
+        // given
+        sessionHandler.setScheduledFuture(null);
+
+        // when
+        sessionHandler.doCancelSessionRenewal();
+
+        // then
+        then(scheduledFuture).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void cancelSessionRenewal_should_returnSessionId() {
+        // given
+        sessionHandler.setScheduledFuture(scheduledFuture);
+        given(scheduledFuture.cancel(true)).willReturn(true);
+        sessionHandler.setSessionId("my-session-id");
+
+        // when
+        final var sessionId = sessionHandler.cancelSessionRenewal().block();
+
+        // then
+        assertThat(sessionId).isEqualTo("my-session-id");
     }
 }

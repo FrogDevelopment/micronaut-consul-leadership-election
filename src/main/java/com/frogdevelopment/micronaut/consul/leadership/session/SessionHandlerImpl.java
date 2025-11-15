@@ -114,7 +114,8 @@ public class SessionHandlerImpl implements SessionHandler {
                 .thenReturn(sessionIdRef.get());
     }
 
-    private void doCancelSessionRenewal() {
+    // @VisibleForTesting
+    void doCancelSessionRenewal() {
         log.debug("No more session, cancelling renewal");
         final ScheduledFuture<?> future = scheduleRef.getAndSet(null);
         if (future != null) {
