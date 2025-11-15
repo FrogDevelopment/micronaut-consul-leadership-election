@@ -189,11 +189,8 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
             final var maxRetries = configuration.getElection().getMaxRetryAttempts();
             final var retry = this.retryCount.incrementAndGet();
             if (retry <= maxRetries) {
-                // todo increase each delay at each error + small random value
-                // read https://medium.com/@kandaanusha/retry-mechanism-50dcad27c0c7
-                final var retryDelayMs = configuration.getElection().getRetryDelayMs();
-                final var duration = Duration.ofMillis(retryDelayMs * retry);
-                log.warn("Recoverable error detected, retrying watch ({}/{}) after delay={}ms", retry, maxRetries, duration);
+                final var duration = calculateRetryDelay(retry);
+                log.warn("Recoverable error detected, retrying watch ({}/{}) after delay={}ms", retry, maxRetries, duration.toMillis());
                 // Add delay before retrying to avoid hammering the server
                 consumer.accept(Mono.delay(duration).then());
             } else {
@@ -201,6 +198,33 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
                 immediateStop();
             }
         }
+    }
+
+    /**
+     * Calculates retry delay using exponential backoff with jitter.
+     * <p>
+     * This implementation prevents thundering herd problems by:
+     * <ul>
+     *   <li>Using exponential backoff (2^retryAttempt)</li>
+     *   <li>Capping maximum delay at 30 seconds</li>
+     *   <li>Adding random jitter (±25%) to spread out retry attempts</li>
+     * </ul>
+     *
+     * @param retryAttempt the current retry attempt number (1-based)
+     * @return the calculated delay duration
+     */
+    private Duration calculateRetryDelay(final long retryAttempt) {
+        final var baseDelayMs = configuration.getElection().getRetryDelayMs();
+        final var maxDelayMs = 30000; // 30 seconds cap
+
+        // Exponential backoff: baseDelay * 2^(retryAttempt - 1)
+        final long exponentialDelay = (long) (baseDelayMs * Math.pow(2, retryAttempt - 1));
+        final long cappedDelay = Math.min(exponentialDelay, maxDelayMs);
+
+        // Add jitter (±25%) to prevent thundering herd
+        final long jitter = (long) (cappedDelay * 0.25 * (Math.random() - 0.5) * 2);
+
+        return Duration.ofMillis(Math.max(0, cappedDelay + jitter));
     }
 
     @Blocking
