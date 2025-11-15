@@ -29,7 +29,7 @@ class LeadershipStatusEndpointTest {
                 .clusterName("cluster")
                 .acquireDateTime("my-date")
                 .build();
-        given(leadershipStatus.geLeadershipInfo()).willReturn(leadershipInfo);
+        given(leadershipStatus.getLeadershipInfo()).willReturn(leadershipInfo);
 
         // when
         final var status = leadershipStatusEndpoint.leadershipStatus();

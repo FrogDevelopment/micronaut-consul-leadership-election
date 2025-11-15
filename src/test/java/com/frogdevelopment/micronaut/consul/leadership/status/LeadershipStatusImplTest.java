@@ -65,13 +65,13 @@ class LeadershipStatusImplTest {
     void should_listenForLeaderInfoChange() {
         // given
         final var leadershipStatus = new LeadershipStatusImpl(Optional.empty());
-        assertThat(leadershipStatus.geLeadershipInfo()).isNull();
+        assertThat(leadershipStatus.getLeadershipInfo()).isNull();
         final var leadershipInfo = LeadershipDetailsDefault.builder().build();
 
         // when
         leadershipStatus.onLeadershipInfoChanged(new LeadershipDetailsChangeEvent(leadershipInfo));
 
         // then
-        assertThat(leadershipStatus.geLeadershipInfo()).isEqualTo(leadershipInfo);
+        assertThat(leadershipStatus.getLeadershipInfo()).isEqualTo(leadershipInfo);
     }
 }

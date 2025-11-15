@@ -47,7 +47,7 @@ public class LeadershipStatusImpl implements LeadershipStatus {
     }
 
     @Override
-    public LeadershipDetails geLeadershipInfo() {
+    public LeadershipDetails getLeadershipInfo() {
         return leadershipDetails;
     }
 
@@ -74,7 +74,7 @@ public class LeadershipStatusImpl implements LeadershipStatus {
      * <p>
      * This method is automatically invoked when a {@link LeadershipDetailsChangeEvent}
      * is published, updating the internal cache with the latest information about
-     * the current leader. This information can then be queried via {@link #geLeadershipInfo()}.
+     * the current leader. This information can then be queried via {@link #getLeadershipInfo()}.
      * </p>
      *
      * @param event the leadership info change event containing updated leader information
