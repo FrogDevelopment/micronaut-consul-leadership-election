@@ -1,6 +1,10 @@
+import org.jreleaser.model.Active
+import org.jreleaser.model.Signing.Mode
+
 plugins {
     id("io.micronaut.minimal.library") version "4.6.1"
     id("org.sonarqube") version "7.0.0.6105"
+    id("org.jreleaser") version "1.21.0"
     `maven-publish`
     jacoco
 }
@@ -85,7 +89,7 @@ java {
         languageVersion = JavaLanguageVersion.of(21)
     }
 
-//    withJavadocJar()
+    withJavadocJar()
     withSourcesJar()
 }
 
@@ -97,6 +101,10 @@ micronaut {
         annotations("com.frogdevelopment.micronaut.consul.leadership.*")
     }
 }
+
+// #######################
+// PUBLISH
+// #######################
 
 publishing {
     publications {
@@ -150,10 +158,62 @@ publishing {
         }
     }
 
-//    repositories {
-//        maven {
-//            name = "jreleaser"
-//            url = uri(layout.buildDirectory.dir("staging-deploy"))
-//        }
-//    }
+    repositories {
+        maven {
+            name = "jreleaser"
+            url = uri(layout.buildDirectory.dir("staging-deploy"))
+        }
+    }
+}
+
+// #######################
+// DEPLOYMENT
+// #######################
+val releaseRegex = """^\d+\.\d+\.\d+$""".toRegex()
+
+jreleaser {
+    gitRootSearch = true
+    dependsOnAssemble = true
+    dryrun = provider { !releaseRegex.matches(version.toString()) }
+
+    project {
+        copyright.set("FrogDevelopment")
+    }
+
+    signing {
+        active = Active.ALWAYS
+        armored = true
+        verify = false
+        mode = Mode.MEMORY
+        files = false
+        artifacts = true
+    }
+
+    deploy {
+        maven {
+            mavenCentral {
+                create(name) {
+                    active = Active.ALWAYS
+                    url = "https://central.sonatype.com/api/v1/publisher"
+                    applyMavenCentralRules = true
+                    snapshotSupported = true
+                    childProjects.forEach { stagingRepository(getStagingRepository(it.value)) }
+                }
+            }
+        }
+    }
+}
+
+fun getStagingRepository(project: Project): String {
+    return project.layout.buildDirectory.dir("staging-deploy").get().toString()
+}
+
+tasks {
+    jreleaserDeploy {
+        dependsOn(jreleaserSign)
+    }
+
+    jreleaserSign {
+        childProjects.forEach { child -> dependsOn(child.value.tasks.named("publish")) }
+    }
 }
