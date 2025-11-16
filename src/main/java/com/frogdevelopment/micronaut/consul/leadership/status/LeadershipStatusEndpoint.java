@@ -47,7 +47,7 @@ public class LeadershipStatusEndpoint {
     public Map<String, Object> leadershipStatus() {
         return Map.of(
                 "isLeader", leadershipStatus.isLeader(),
-                "details", leadershipStatus.geLeadershipInfo()
+                "details", leadershipStatus.getLeadershipInfo()
         );
     }
 

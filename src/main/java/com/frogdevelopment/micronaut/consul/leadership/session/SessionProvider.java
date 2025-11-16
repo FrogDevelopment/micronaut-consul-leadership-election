@@ -1,7 +1,5 @@
 package com.frogdevelopment.micronaut.consul.leadership.session;
 
-import io.micronaut.context.annotation.DefaultImplementation;
-
 /**
  * Provider interface for creating Consul sessions used in leadership election.
  * <p>
@@ -11,13 +9,12 @@ import io.micronaut.context.annotation.DefaultImplementation;
  * affects the behavior of the leadership election process.
  * </p>
  * <p>
- * The default implementation uses the leadership configuration to create sessions
+ * The implementation uses the leadership configuration to create sessions
  * with appropriate settings for distributed leadership election.
  * </p>
  *
  * @since 1.0.0
  */
-@DefaultImplementation(SessionProviderDefaultImpl.class)
 public interface SessionProvider {
 
     /**

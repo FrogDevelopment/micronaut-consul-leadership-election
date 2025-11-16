@@ -24,5 +24,5 @@ public interface LeadershipStatus {
      * @return the current leadership information, or {@code null} if no leader information is available yet
      */
     @Nullable
-    LeadershipDetails geLeadershipInfo();
+    LeadershipDetails getLeadershipInfo();
 }

@@ -158,12 +158,11 @@ class SessionHandlerImplTest {
         given(client.renewSession("my-session-id")).willReturn(Mono.error(new RuntimeException("boom")));
 
         // when
-        sessionHandler.renewSession();
+        sessionHandler.manageSessionRenewal();
 
         // then
         then(client).shouldHaveNoMoreInteractions();
         assertThat(sessionHandler.getSessionId()).isEqualTo("my-session-id");
-        // todo check logs
     }
 
     @Test
@@ -175,7 +174,7 @@ class SessionHandlerImplTest {
         given(client.renewSession("my-session-id")).willReturn(Mono.empty());
 
         // when
-        sessionHandler.renewSession();
+        sessionHandler.manageSessionRenewal();
 
         // then
         then(client).shouldHaveNoMoreInteractions();
@@ -183,14 +182,14 @@ class SessionHandlerImplTest {
     }
 
     @Test
-    void cancelSessionRenewal_should_cancelScheduledFuture() {
+    void manageSessionRenewal_should_cancelScheduledFuture() {
         // given
-        sessionHandler.setSessionId("my-session-id");
+        sessionHandler.setSessionId(null);
         sessionHandler.setScheduledFuture(scheduledFuture);
         given(scheduledFuture.cancel(true)).willReturn(true);
 
         // when
-        sessionHandler.cancelSessionRenewal().block();
+        sessionHandler.manageSessionRenewal();
 
         //
         then(scheduledFuture).shouldHaveNoMoreInteractions();
@@ -198,18 +197,43 @@ class SessionHandlerImplTest {
     }
 
     @Test
-    void cancelSessionRenewal_should_logWarning_when_cancellationFails() {
+    void manageSessionRenewal_should_logWarning_when_cancellationFails() {
         // given
-        sessionHandler.setSessionId("my-session-id");
+        sessionHandler.setSessionId(null);
         sessionHandler.setScheduledFuture(scheduledFuture);
         given(scheduledFuture.cancel(true)).willReturn(false);
 
         // when
-        sessionHandler.cancelSessionRenewal().block();
+        sessionHandler.manageSessionRenewal();
 
         //
         then(scheduledFuture).shouldHaveNoMoreInteractions();
         assertThat(sessionHandler.getScheduledFuture()).isNull();
-        // todo check logs
+    }
+
+    @Test
+    void doCancelSessionRenewal_should_handleNullScheduleFuture() {
+        // given
+        sessionHandler.setScheduledFuture(null);
+
+        // when
+        sessionHandler.doCancelSessionRenewal();
+
+        // then
+        then(scheduledFuture).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void cancelSessionRenewal_should_returnSessionId() {
+        // given
+        sessionHandler.setScheduledFuture(scheduledFuture);
+        given(scheduledFuture.cancel(true)).willReturn(true);
+        sessionHandler.setSessionId("my-session-id");
+
+        // when
+        final var sessionId = sessionHandler.cancelSessionRenewal().block();
+
+        // then
+        assertThat(sessionId).isEqualTo("my-session-id");
     }
 }

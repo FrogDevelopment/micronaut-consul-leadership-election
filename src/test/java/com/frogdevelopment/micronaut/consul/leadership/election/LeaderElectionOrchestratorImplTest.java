@@ -94,6 +94,7 @@ class LeaderElectionOrchestratorImplTest {
 
             return Mono.just(List.of(mockedKeyValue));
         });
+        given(mockedKeyValue.getModifyIndex()).willReturn(1_234);
 
         // When
         leaderElectionOrchestrator.start();
@@ -228,7 +229,12 @@ class LeaderElectionOrchestratorImplTest {
     void watchForLeadershipInfoChanges_should_immediatelyStop_when_NonRecoverableErrorOccurs() {
         // given
         given(configuration.getPath()).willReturn("my-path");
+        given(configuration.getElection()).willReturn(electionConfiguration);
+        given(electionConfiguration.getTimeoutMs()).willReturn(12);
         given(client.watchLeadership("my-path", 1234)).willReturn(Mono.error(new NonRecoverableElectionException("boom")));
+        given(sessionHandler.cancelSessionRenewal()).willReturn(Mono.just("session-id"));
+        given(leadershipHandler.releaseLeadership("session-id")).willReturn(Mono.empty());
+        given(sessionHandler.destroySession()).willReturn(Mono.empty());
 
         // when
         leaderElectionOrchestrator.watchForLeadershipInfoChanges(Mono.just(1234));
@@ -270,6 +276,8 @@ class LeaderElectionOrchestratorImplTest {
         given(configuration.getElection()).willReturn(electionConfiguration);
         given(electionConfiguration.getMaxRetryAttempts()).willReturn(2);
         given(electionConfiguration.getRetryDelayMs()).willReturn(5);
+
+        given(sessionHandler.createNewSession()).willReturn(Mono.empty());
 
         // when
         leaderElectionOrchestrator.watchForLeadershipInfoChanges(Mono.just(1234));
@@ -336,8 +344,6 @@ class LeaderElectionOrchestratorImplTest {
         given(mockedKeyValue.getModifyIndex()).willReturn(1234);
         given(mockedKeyValue.getSession()).willReturn("my-session-id");
         given(mockedKeyValue.getValue()).willReturn("my-kv-content");
-        given(configuration.getPath()).willReturn("my-path");
-        given(client.watchLeadership("my-path", 1234)).willReturn(Mono.empty());
 
         // when
         leaderElectionOrchestrator.onLeadershipChanges(List.of(mockedKeyValue));

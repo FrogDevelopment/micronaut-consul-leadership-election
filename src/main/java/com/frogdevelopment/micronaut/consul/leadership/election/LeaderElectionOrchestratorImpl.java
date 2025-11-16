@@ -7,6 +7,7 @@ import lombok.val;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -92,7 +93,7 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
     }
 
     private Mono<Integer> handleIsLeader() {
-        log.info("Leadership acquired successfully \uD83C\uDF89 \uD83D\uDC51 \uD83C\uDF89");
+        log.info("Leadership acquired successfully");
         // when leader, periodically renew the session to avoid expiration
         return sessionHandler.scheduleSessionRenewal()
                 // when acquiring leadership, we updated the KV => index has changed
@@ -105,7 +106,7 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
     }
 
     private Mono<Integer> handleIsNotLeader() {
-        log.info("Leadership acquisition failed, another leader exists \uD83D\uDE29 \uD83D\uDE2D");
+        log.info("Leadership acquisition failed, another leader exists");
         return sessionHandler.destroySession()
                 .then(Mono.defer(() -> Optional.ofNullable(modifyIndexRef.get())
                         .map(Mono::just)
@@ -189,11 +190,8 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
             final var maxRetries = configuration.getElection().getMaxRetryAttempts();
             final var retry = this.retryCount.incrementAndGet();
             if (retry <= maxRetries) {
-                // todo increase each delay at each error + small random value
-                // read https://medium.com/@kandaanusha/retry-mechanism-50dcad27c0c7
-                final var retryDelayMs = configuration.getElection().getRetryDelayMs();
-                final var duration = Duration.ofMillis(retryDelayMs * retry);
-                log.warn("Recoverable error detected, retrying watch ({}/{}) after delay={}ms", retry, maxRetries, duration);
+                final var duration = calculateRetryDelay(retry);
+                log.warn("Recoverable error detected, retrying watch ({}/{}) after delay={}ms", retry, maxRetries, duration.toMillis());
                 // Add delay before retrying to avoid hammering the server
                 consumer.accept(Mono.delay(duration).then());
             } else {
@@ -201,6 +199,34 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
                 immediateStop();
             }
         }
+    }
+
+    /**
+     * Calculates retry delay using exponential backoff with jitter.
+     * <p>
+     * This implementation prevents thundering herd problems by:
+     * <ul>
+     *   <li>Using exponential backoff (2^retryAttempt)</li>
+     *   <li>Capping maximum delay at 30 seconds</li>
+     *   <li>Adding random jitter (±25%) to spread out retry attempts</li>
+     * </ul>
+     *
+     * @param retryAttempt the current retry attempt number (1-based)
+     * @return the calculated delay duration
+     */
+    private Duration calculateRetryDelay(final long retryAttempt) {
+        final var baseDelayMs = configuration.getElection().getRetryDelayMs();
+        final var maxDelayMs = 30000; // 30 seconds cap
+
+        // Exponential backoff: baseDelay * 2^(retryAttempt - 1)
+        final long exponentialDelay = (long) (baseDelayMs * Math.pow(2, retryAttempt - 1.0));
+        final long cappedDelay = Math.min(exponentialDelay, maxDelayMs);
+
+        // Add jitter (±25%) to prevent thundering herd
+        final long maxJitter = (long) (cappedDelay * 0.25);
+        final long jitter = maxJitter > 0 ? ThreadLocalRandom.current().nextLong(-maxJitter, maxJitter + 1) : 0;
+
+        return Duration.ofMillis(Math.max(0, cappedDelay + jitter));
     }
 
     @Blocking

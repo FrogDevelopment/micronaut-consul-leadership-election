@@ -5,9 +5,15 @@
 
 # Micronaut Consul Leadership Election
 
-A Micronaut library that provides distributed leadership election capabilities using HashiCorp Consul. This library
-enables multiple instances of an application to coordinate and elect a single leader, ensuring that only one instance
+A Micronaut library that provides distributed leadership election capabilities **across multiple clusters** using
+HashiCorp Consul.
+This library enables multiple instances of an application deployed among multiple clusters to coordinate and elect a
+single leader, ensuring that only one instance
 performs critical operations at any given time.
+
+> :warning: If you need Leader Election in a **single cluster**, you may instead directly
+> use [Micronaut Kubernetes](https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/) Leader Election
+> feature.
 
 ## Features
 
@@ -22,13 +28,13 @@ performs critical operations at any given time.
 - **Event-Driven Architecture**: Publish leadership change events for reactive application behavior
 - **Comprehensive Documentation**: Fully documented API with detailed JavaDoc for all public classes and methods
 - **Graceful Shutdown**: Properly releases leadership and cleans up resources during application shutdown
+- **Pod label update**: Pod label updated according to current leadership status, toggleable and configurable
 
 ## Requirements
 
 - Java 21 or higher
-- Micronaut Framework 4.x
-- HashiCorp Consul server
-- Reactive Streams support (Project Reactor)
+- [Micronaut Framework](https://micronaut.io/) 4.x
+- [HashiCorp Consul](https://developer.hashicorp.com/consul) server
 
 ## Installation
 
@@ -37,7 +43,7 @@ Add the dependency to your `build.gradle` (Gradle) or `pom.xml` (Maven):
 ### Gradle
 
 ```kotlin
-implementation("frog.development.micronaut.consul:leadership-election:1.0.0-SNAPSHOT")
+implementation("com.frogdevelopment.micronaut.consul:leadership-election:1.0.0-SNAPSHOT")
 ```
 
 ### Maven
@@ -45,7 +51,7 @@ implementation("frog.development.micronaut.consul:leadership-election:1.0.0-SNAP
 ```xml
 
 <dependency>
-    <groupId>frog.development.micronaut.consul</groupId>
+    <groupId>com.frogdevelopment.micronaut.consul</groupId>
     <artifactId>leadership-election</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
@@ -64,6 +70,14 @@ implementation("frog.development.micronaut.consul:leadership-election:1.0.0-SNAP
 | `consul.leadership.election.max-retry-attempts`    | Integer  | `3`                                        | Maximum number of retry attempts for operations                             |
 | `consul.leadership.election.retry-delay-ms`        | Integer  | `500`                                      | Delay between retry attempts in milliseconds                                |
 | `consul.leadership.election.timeout-ms`            | Integer  | `3000`                                     | Timeout for Consul operations in milliseconds                               |
+| `consul.leadership.pod-label.enabled`              | Boolean  | `true`                                     | Enable/disable pod label update with leadership status                      |
+| `consul.leadership.pod-label.key`                  | String   | `leadership-status`                        | Customize pod label key                                                     |
+| `consul.leadership.pod-label.label-for-leader`     | String   | `leader`                                   | Customize pod label value in case of leader                                 |
+| `consul.leadership.pod-label.label-for-follower`   | String   | `follower`                                 | Customize pod label value in case of not leader                             |
+
+> **Note:** When pod label updates are enabled (`consul.leadership.pod-label.enabled=true`), the service account
+> requires Kubernetes RBAC permissions to patch pods. See [Security Considerations](#security-considerations) for required
+> RBAC configuration and how to disable this feature if needed.
 
 ## Usage
 
@@ -131,7 +145,7 @@ import io.micronaut.runtime.event.annotation.EventListener;
 @EventListener
 public void onLeadershipInfoDetailsChange(final LeadershipDetailsChangeEvent event) {
     final LeadershipDetails details = event.leadershipDetails();
-    // Access leader details like hostname, cluster name, timestamps, etc.
+    // Access leader details like pod name, namespace,  cluster name, timestamps, etc.
 }
 ```
 
@@ -149,10 +163,10 @@ Response example:
 {
   "isLeader": true,
   "details": {
-    "hostname": "app-instance-1",
+    "podName": "app-instance-1",
+    "namespace": "production-environment",
     "clusterName": "production-cluster",
-    "acquireDateTime": "2025-10-18T22:45:30",
-    "releaseDateTime": null
+    "acquireDateTime": "2025-10-18T22:45:30"
   }
 }
 ```
@@ -163,31 +177,6 @@ This endpoint is useful for:
 - Load balancer routing decisions
 - Operational dashboards
 - External system integration
-
-### Custom Session Provider
-
-You can provide your own session configuration by implementing the `SessionProvider` interface:
-
-```java
-import com.frogdevelopment.micronaut.consul.leadership.election.SessionProvider;
-import com.frogdevelopment.micronaut.consul.leadership.client.Session;
-
-import jakarta.inject.Singleton;
-
-@Singleton
-public class CustomSessionProvider implements SessionProvider {
-
-    @Override
-    public Session createSession() {
-        return Session.builder()
-                .name("custom-session-name")
-                .behavior(Session.Behavior.RELEASE)
-                .lockDelay("10s")
-                .ttl("30s")
-                .build();
-    }
-}
-```
 
 ### Custom Leadership Details Provider
 
@@ -206,7 +195,6 @@ public class CustomLeadershipDetailsProvider implements LeadershipDetailsProvide
     public LeadershipDetails getLeadershipInfo(final boolean isAcquire) {
         return MyLeadershipDetails.builder()
                 .hostname("my-custom-hostname")
-                .clusterName("production-cluster")
                 .provider("GCP")
                 .build();
     }
@@ -267,6 +255,67 @@ flowchart TB
     cancelSessionRenewal --> releaseLeadership[Release Leadership]
     releaseLeadership --> destroySession[Destroy Session]
     destroySession --> x
+```
+
+## Security Considerations
+
+### Consul ACL Token Security
+
+The library requires a Consul ACL token with appropriate permissions to manage sessions and key-value operations. *
+*Never store tokens in configuration files committed to version control.**
+
+#### Recommended Approach: Environment Variables
+
+```yaml
+consul:
+  leadership:
+    token: ${CONSUL_TOKEN}
+```
+
+#### Required Consul ACL Permissions
+
+The token must have the following permissions:
+
+```hcl
+# Session management
+session "write" {
+  policy = "write"
+}
+
+# KV store for leadership coordination
+key_prefix "leadership/" {
+  policy = "write"
+}
+```
+
+For more restrictive policies, limit the KV prefix to match your configured path (e.g., `leadership/your-app-name/`).
+
+### Kubernetes RBAC for Pod Label Updates
+
+When the pod label update feature is enabled (`consul.leadership.pod-label.enabled=true`), the service account requires
+specific RBAC permissions.
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: leadership-pod-updater
+  namespace: your-namespace
+rules:
+  - apiGroups: [ "" ]
+    resources: [ "pods" ]
+    verbs: [ "patch" ]
+```
+
+#### Disabling Pod Label Updates
+
+If Kubernetes integration is not needed or RBAC permissions cannot be granted:
+
+```yaml
+consul:
+  leadership:
+    pod-label:
+      enabled: false
 ```
 
 ## Best Practices

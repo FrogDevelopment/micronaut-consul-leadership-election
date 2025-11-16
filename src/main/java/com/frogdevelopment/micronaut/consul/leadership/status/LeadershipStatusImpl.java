@@ -1,12 +1,18 @@
 package com.frogdevelopment.micronaut.consul.leadership.status;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import jakarta.inject.Singleton;
 
 import com.frogdevelopment.micronaut.consul.leadership.details.LeadershipDetails;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipChangeEvent;
 import com.frogdevelopment.micronaut.consul.leadership.event.LeadershipDetailsChangeEvent;
+import com.frogdevelopment.micronaut.consul.leadership.kubernetes.UpdatePodLabel;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.runtime.event.annotation.EventListener;
@@ -29,19 +35,22 @@ import io.micronaut.runtime.event.annotation.EventListener;
  */
 @Slf4j
 @Singleton
+@RequiredArgsConstructor
 public class LeadershipStatusImpl implements LeadershipStatus {
 
-    private boolean isLeader;
-    private LeadershipDetails leadershipDetails;
+    private final Optional<UpdatePodLabel> updatePodLabel;
+
+    private final AtomicBoolean isLeader = new AtomicBoolean(false);
+    private final AtomicReference<LeadershipDetails> leadershipDetails = new AtomicReference<>();
 
     @Override
     public boolean isLeader() {
-        return isLeader;
+        return isLeader.get();
     }
 
     @Override
-    public LeadershipDetails geLeadershipInfo() {
-        return leadershipDetails;
+    public LeadershipDetails getLeadershipInfo() {
+        return leadershipDetails.get();
     }
 
     /**
@@ -56,8 +65,11 @@ public class LeadershipStatusImpl implements LeadershipStatus {
      */
     @EventListener
     public void onLeadershipChanged(@NonNull final LeadershipChangeEvent event) {
-        this.isLeader = event.isLeader();
-        log.debug("Current leader: {}", isLeader);
+        final var leader = event.isLeader();
+        this.isLeader.set(leader);
+        log.debug("Current leader: {}", leader);
+
+        updatePodLabel.ifPresent(podLabel -> podLabel.updatePodLabel(leader));
     }
 
     /**
@@ -65,15 +77,16 @@ public class LeadershipStatusImpl implements LeadershipStatus {
      * <p>
      * This method is automatically invoked when a {@link LeadershipDetailsChangeEvent}
      * is published, updating the internal cache with the latest information about
-     * the current leader. This information can then be queried via {@link #geLeadershipInfo()}.
+     * the current leader. This information can then be queried via {@link #getLeadershipInfo()}.
      * </p>
      *
      * @param event the leadership info change event containing updated leader information
      */
     @EventListener
     public void onLeadershipInfoChanged(@NonNull final LeadershipDetailsChangeEvent event) {
-        this.leadershipDetails = event.leadershipDetails();
-        log.debug("Current leader information: {}", leadershipDetails);
+        final var details = event.leadershipDetails();
+        this.leadershipDetails.set(details);
+        log.debug("Current leader information: {}", details);
     }
 
 }

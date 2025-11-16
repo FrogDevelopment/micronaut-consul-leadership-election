@@ -1,5 +1,5 @@
 plugins {
-    id("io.micronaut.minimal.library") version "4.6.0"
+    id("io.micronaut.minimal.library") version "4.6.1"
     id("org.sonarqube") version "7.0.0.6105"
     `maven-publish`
     jacoco
@@ -24,6 +24,8 @@ dependencies {
     implementation(mn.reactor)
 
     compileOnly(mn.lombok)
+    compileOnly(mn.micronaut.kubernetes.client.openapi)
+    compileOnly(mn.micronaut.kubernetes.client.openapi.common)
 
     runtimeOnly(mn.logback.classic)
 
@@ -34,6 +36,8 @@ dependencies {
     testImplementation(mn.assertj.core)
     testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.awaitility)
+    testImplementation(mn.micronaut.kubernetes.client.openapi)
+    testImplementation(mn.micronaut.kubernetes.client.openapi.common)
 
     testRuntimeOnly(mn.micronaut.http.server.netty)
     testRuntimeOnly(mn.micronaut.http.client)
@@ -81,7 +85,7 @@ java {
         languageVersion = JavaLanguageVersion.of(21)
     }
 
-    withJavadocJar()
+//    withJavadocJar()
     withSourcesJar()
 }
 
@@ -98,6 +102,8 @@ publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             artifactId = "leadership-election"
+
+            from(components["java"])
 
             versionMapping {
                 usage("java-api") {

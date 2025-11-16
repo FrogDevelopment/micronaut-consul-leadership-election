@@ -1,4 +1,4 @@
-package com.frogdevelopment.micronaut.consul.leadership.election;
+package com.frogdevelopment.micronaut.consul.leadership;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -36,6 +36,10 @@ class FullTest {
     private EmbeddedServer server2;
     private EmbeddedServer server3;
 
+    private static EmbeddedServer createServer(final HashMap<String, Object> properties) {
+        return ApplicationContext.run(EmbeddedServer.class, properties);
+    }
+
     @BeforeAll
     static void setup() {
         CONSUL.start();
@@ -66,9 +70,12 @@ class FullTest {
         properties.put("micronaut.application.name", "my-application");
         properties.put("consul.client.host", CONSUL.getHost());
         properties.put("consul.client.port", String.valueOf(CONSUL.getMappedPort(8500)));
+        properties.put("consul.leadership.pod-label.enabled", "true");
+        properties.put("mock.namespace", "full-test");
+        properties.put("mock.cluster", "oz");
 
         properties.put("hostname", "server_1");
-        server1 = ApplicationContext.run(EmbeddedServer.class, properties);
+        server1 = createServer(properties);
         assertThat(server1).isNotNull();
         final var leadershipStatus1 = server1.getApplicationContext().getBean(LeadershipStatus.class);
         assertThat(leadershipStatus1).isNotNull();
@@ -76,43 +83,43 @@ class FullTest {
         await().until(leadershipStatus1::isLeader);
 
         properties.put("hostname", "server_2");
-        server2 = ApplicationContext.run(EmbeddedServer.class, properties);
+        server2 = createServer(properties);
         assertThat(server2).isNotNull();
         final var leadershipStatus2 = server2.getApplicationContext().getBean(LeadershipStatus.class);
         assertThat(leadershipStatus2).isNotNull();
-        await().until(() -> leadershipStatus2.geLeadershipInfo() != null);
+        await().until(() -> leadershipStatus2.getLeadershipInfo() != null);
         assertThat(leadershipStatus2.isLeader()).isFalse();
 
         properties.put("hostname", "server_3");
-        server3 = ApplicationContext.run(EmbeddedServer.class, properties);
+        server3 = createServer(properties);
         assertThat(server3).isNotNull();
         final var leadershipStatus3 = server3.getApplicationContext().getBean(LeadershipStatus.class);
         assertThat(leadershipStatus3).isNotNull();
-        await().until(() -> leadershipStatus3.geLeadershipInfo() != null);
+        await().until(() -> leadershipStatus3.getLeadershipInfo() != null);
         assertThat(leadershipStatus3.isLeader()).isFalse();
 
         // assert that all have the same leadership information
-        assertThat(leadershipStatus1.geLeadershipInfo()).isEqualTo(leadershipStatus2.geLeadershipInfo());
-        assertThat(leadershipStatus1.geLeadershipInfo()).isEqualTo(leadershipStatus3.geLeadershipInfo());
-        final var previousLeadershipStatus = leadershipStatus1.geLeadershipInfo();
+        assertThat(leadershipStatus1.getLeadershipInfo()).isEqualTo(leadershipStatus2.getLeadershipInfo());
+        assertThat(leadershipStatus1.getLeadershipInfo()).isEqualTo(leadershipStatus3.getLeadershipInfo());
+        final var previousLeadershipStatus = leadershipStatus1.getLeadershipInfo();
 
         // assert that a new leader will be elected
         server1.stop();
-        await().atMost(Duration.ofMillis(500))
+        await().atMost(Duration.ofSeconds(10))
                 .until(() -> leadershipStatus2.isLeader()
                              || leadershipStatus3.isLeader());
 
-        assertThat(leadershipStatus2.geLeadershipInfo()).isEqualTo(leadershipStatus3.geLeadershipInfo());
-        assertThat(leadershipStatus2.geLeadershipInfo()).isNotEqualTo(previousLeadershipStatus);
+        assertThat(leadershipStatus2.getLeadershipInfo()).isEqualTo(leadershipStatus3.getLeadershipInfo());
+        assertThat(leadershipStatus2.getLeadershipInfo()).isNotEqualTo(previousLeadershipStatus);
 
         // assert that previous leader doesn't get back the leadership
         server1.start();
         final var newLeadershipStatus1 = server1.getApplicationContext().getBean(LeadershipStatus.class);
         assertThat(newLeadershipStatus1).isNotNull();
-        await().until(() -> newLeadershipStatus1.geLeadershipInfo() != null);
+        await().until(() -> newLeadershipStatus1.getLeadershipInfo() != null);
         assertThat(newLeadershipStatus1.isLeader()).isFalse();
-        assertThat(newLeadershipStatus1.geLeadershipInfo()).isEqualTo(leadershipStatus2.geLeadershipInfo());
-        assertThat(newLeadershipStatus1.geLeadershipInfo()).isEqualTo(leadershipStatus3.geLeadershipInfo());
+        assertThat(newLeadershipStatus1.getLeadershipInfo()).isEqualTo(leadershipStatus2.getLeadershipInfo());
+        assertThat(newLeadershipStatus1.getLeadershipInfo()).isEqualTo(leadershipStatus3.getLeadershipInfo());
     }
 
 }

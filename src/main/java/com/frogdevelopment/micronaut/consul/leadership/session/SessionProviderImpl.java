@@ -3,11 +3,13 @@ package com.frogdevelopment.micronaut.consul.leadership.session;
 
 import lombok.RequiredArgsConstructor;
 
+import java.util.Optional;
+
 import jakarta.inject.Singleton;
 
 import com.frogdevelopment.micronaut.consul.leadership.LeadershipConfiguration;
+import com.frogdevelopment.micronaut.consul.leadership.kubernetes.KubernetesInfoResolver;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 
 /**
@@ -17,7 +19,7 @@ import io.micronaut.context.env.Environment;
  * This implementation creates sessions with the following characteristics:
  * </p>
  * <ul>
- *   <li>Session name - derived from the hostname environment property or defaults to empty string</li>
+ *   <li>Session name - derived from Kubernetes pod name, hostname, or application name (in that order of preference)</li>
  *   <li>Session behavior - set to RELEASE, meaning locks are released when the session expires</li>
  *   <li>Lock delay - configured from leadership election settings to prevent rapid lock re-acquisition</li>
  *   <li>TTL (Time To Live) - configured from leadership election settings for session expiration</li>
@@ -27,18 +29,14 @@ import io.micronaut.context.env.Environment;
  * The lock delay prevents the "thundering herd" problem when leadership changes,
  * while the TTL ensures that failed instances don't hold locks indefinitely.
  * </p>
- * <p>
- * This bean is only instantiated when no other {@link SessionProvider} implementation
- * is available in the application context.
- * </p>
  *
  * @since 1.0.0
  */
 @Singleton
 @RequiredArgsConstructor
-@Requires(missingBeans = SessionProvider.class)
-final class SessionProviderDefaultImpl implements SessionProvider {
+final class SessionProviderImpl implements SessionProvider {
 
+    private final Optional<KubernetesInfoResolver> kubernetesInfoResolver;
     private final Environment environment;
     private final LeadershipConfiguration configuration;
 
@@ -64,7 +62,10 @@ final class SessionProviderDefaultImpl implements SessionProvider {
     @Override
     public Session createSession() {
         return Session.builder()
-                .name(environment.get("hostname", String.class, "n/a"))
+                .name(kubernetesInfoResolver.flatMap(KubernetesInfoResolver::resolvePodName)
+                        .or(() -> environment.getProperty("hostname", String.class))
+                        .or(() -> environment.getProperty("micronaut.application.name", String.class))
+                        .orElseThrow(() -> new IllegalStateException("Neither Pod Name hostname nor application name was resolvable!")))
                 .behavior(Session.Behavior.RELEASE)
                 .lockDelay(configuration.getElection().getSessionLockDelay())
                 .ttl(configuration.getElection().getSessionTtl())
