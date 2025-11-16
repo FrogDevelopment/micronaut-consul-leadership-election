@@ -7,6 +7,7 @@ import lombok.val;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -218,11 +219,12 @@ public class LeaderElectionOrchestratorImpl implements LeaderElectionOrchestrato
         final var maxDelayMs = 30000; // 30 seconds cap
 
         // Exponential backoff: baseDelay * 2^(retryAttempt - 1)
-        final long exponentialDelay = (long) (baseDelayMs * Math.pow(2, retryAttempt - 1));
+        final long exponentialDelay = (long) (baseDelayMs * Math.pow(2, retryAttempt - 1.0));
         final long cappedDelay = Math.min(exponentialDelay, maxDelayMs);
 
         // Add jitter (±25%) to prevent thundering herd
-        final long jitter = (long) (cappedDelay * 0.25 * (Math.random() - 0.5) * 2);
+        final long maxJitter = (long) (cappedDelay * 0.25);
+        final long jitter = maxJitter > 0 ? ThreadLocalRandom.current().nextLong(-maxJitter, maxJitter + 1) : 0;
 
         return Duration.ofMillis(Math.max(0, cappedDelay + jitter));
     }

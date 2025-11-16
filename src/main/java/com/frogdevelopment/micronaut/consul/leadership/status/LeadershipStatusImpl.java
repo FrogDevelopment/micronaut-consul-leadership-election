@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import jakarta.inject.Singleton;
 
@@ -38,17 +40,17 @@ public class LeadershipStatusImpl implements LeadershipStatus {
 
     private final Optional<UpdatePodLabel> updatePodLabel;
 
-    private volatile boolean isLeader;
-    private volatile LeadershipDetails leadershipDetails;
+    private final AtomicBoolean isLeader = new AtomicBoolean(false);
+    private final AtomicReference<LeadershipDetails> leadershipDetails = new AtomicReference<>();
 
     @Override
     public boolean isLeader() {
-        return isLeader;
+        return isLeader.get();
     }
 
     @Override
     public LeadershipDetails getLeadershipInfo() {
-        return leadershipDetails;
+        return leadershipDetails.get();
     }
 
     /**
@@ -63,10 +65,11 @@ public class LeadershipStatusImpl implements LeadershipStatus {
      */
     @EventListener
     public void onLeadershipChanged(@NonNull final LeadershipChangeEvent event) {
-        this.isLeader = event.isLeader();
-        log.debug("Current leader: {}", isLeader);
+        final var leader = event.isLeader();
+        this.isLeader.set(leader);
+        log.debug("Current leader: {}", leader);
 
-        updatePodLabel.ifPresent(podLabel -> podLabel.updatePodLabel(isLeader));
+        updatePodLabel.ifPresent(podLabel -> podLabel.updatePodLabel(leader));
     }
 
     /**
@@ -81,8 +84,9 @@ public class LeadershipStatusImpl implements LeadershipStatus {
      */
     @EventListener
     public void onLeadershipInfoChanged(@NonNull final LeadershipDetailsChangeEvent event) {
-        this.leadershipDetails = event.leadershipDetails();
-        log.debug("Current leader information: {}", leadershipDetails);
+        final var details = event.leadershipDetails();
+        this.leadershipDetails.set(details);
+        log.debug("Current leader information: {}", details);
     }
 
 }
