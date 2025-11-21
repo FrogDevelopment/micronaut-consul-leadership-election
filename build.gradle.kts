@@ -1,6 +1,6 @@
 plugins {
     id("io.micronaut.minimal.library") version "4.6.1"
-    id("org.sonarqube") version "7.0.0.6105"
+    id("org.sonarqube") version "7.1.0.6387"
     `maven-publish`
     jacoco
 }
